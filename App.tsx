@@ -239,7 +239,7 @@ const App: React.FC = () => {
                   onClick={() => setCurrentPage('signup')} 
                   className="px-12 py-6 border-2 border-gold-500/50 text-gold-500 font-black rounded-2xl hover:bg-gold-500/10 transition-all text-xl w-full md:w-auto"
                 >
-                  Join the Club
+                  Apply Now
                 </button>
               </div>
             </div>
