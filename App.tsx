@@ -31,7 +31,7 @@ const App: React.FC = () => {
   const [depositModalOpen, setDepositModalOpen] = useState(false);
   const [withdrawModalOpen, setWithdrawModalOpen] = useState(false);
 
-  // Sync with DB
+  // ডাটাবেস থেকে ইনিশিয়াল ডাটা লোড করা
   useEffect(() => {
     const init = async () => {
       setIsLoading(true);
@@ -47,7 +47,7 @@ const App: React.FC = () => {
           { name: 'Manual Transfer', active: true, apiKey: 'man', bankName: 'Elite Global', accountNumber: 'Elite-01-99', currency: 'USD', logoUrl: 'https://img.icons8.com/color/96/bank.png', merchantName: 'Ama.zon Corp', minDeposit: 10, maxDeposit: 1000000, feePercent: 0 }
         ]);
       } catch (err) {
-        console.error("DB Init failed:", err);
+        console.error("Database connection error:", err);
       } finally {
         setIsLoading(false);
       }
@@ -55,6 +55,7 @@ const App: React.FC = () => {
     init();
   }, []);
 
+  // দামের উঠানামা সিমুলেশন
   useEffect(() => {
     const interval = setInterval(() => setAssets(prev => fluctuatePrices(prev)), 5000);
     return () => clearInterval(interval);
@@ -69,15 +70,33 @@ const App: React.FC = () => {
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
-    const normalizedEmail = email.toLowerCase();
+    const inputEmail = email.trim();
+    const inputPass = password.trim();
     
-    if (normalizedEmail.includes('admin')) {
-      const admin: User = { id: 'admin-1', name: 'Master Admin', email: 'admin@ama.zon', role: 'ADMIN', balance: 9999999, portfolio: {} as any };
+    // Admin check with specific user credentials
+    if (inputEmail === 'emukhan580' && inputPass === 'Imran2015@!@!') {
+      const admin: User = { 
+        id: 'admin-1', 
+        name: 'Master Admin', 
+        email: 'emukhan580', 
+        role: 'ADMIN', 
+        balance: 9999999, 
+        portfolio: {
+          [AssetType.BITCOIN]: 0,
+          [AssetType.DIAMOND]: 0,
+          [AssetType.GOLD]: 0,
+          [AssetType.SILVER]: 0,
+          [AssetType.PLATINUM]: 0,
+          [AssetType.ANTIMATTER]: 0,
+          [AssetType.AI_COMPUTE]: 0
+        } as any 
+      };
       setUser(admin);
       setCurrentPage('admin');
       return;
     }
 
+    const normalizedEmail = inputEmail.toLowerCase();
     const existingUser = users.find(u => u.email.toLowerCase() === normalizedEmail);
     if (existingUser) {
       setUser(existingUser);
@@ -85,11 +104,19 @@ const App: React.FC = () => {
     } else {
       const newUser: User = { 
         id: generateId(), 
-        name: email.split('@')[0], 
-        email, 
+        name: inputEmail.includes('@') ? inputEmail.split('@')[0] : inputEmail, 
+        email: inputEmail, 
         role: 'USER', 
         balance: 5000, 
-        portfolio: { [AssetType.BITCOIN]: 0, [AssetType.GOLD]: 0, [AssetType.DIAMOND]: 0, [AssetType.SILVER]: 0, [AssetType.PLATINUM]: 0, [AssetType.ANTIMATTER]: 0, [AssetType.AI_COMPUTE]: 0 } as any 
+        portfolio: { 
+          [AssetType.BITCOIN]: 0, 
+          [AssetType.GOLD]: 0, 
+          [AssetType.DIAMOND]: 0, 
+          [AssetType.SILVER]: 0, 
+          [AssetType.PLATINUM]: 0,
+          [AssetType.ANTIMATTER]: 0,
+          [AssetType.AI_COMPUTE]: 0
+        } as any 
       };
       await DB.syncUser(newUser);
       setUsers(prev => [...prev, newUser]);
@@ -155,13 +182,6 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen flex flex-col bg-black text-slate-100 font-sans selection:bg-gold-500/30 overflow-x-hidden">
-      {!isSupabaseConfigured && (
-        <div className="bg-amber-500/10 border-b border-amber-500/20 py-2 px-4 flex items-center justify-center space-x-2 text-amber-500 text-[10px] font-black uppercase tracking-widest z-[100]">
-          <AlertTriangle size={14} />
-          <span>Notice: Local Sandbox Mode. Connect Supabase for real-time storage.</span>
-        </div>
-      )}
-      
       <NewsTicker />
       <Navbar 
         user={user} 
@@ -201,7 +221,7 @@ const App: React.FC = () => {
             <div className="w-full max-w-md bg-slate-900 border border-white/10 p-12 rounded-[3rem] shadow-2xl">
               <h2 className="text-4xl font-serif font-bold text-white mb-10 text-center">Identity Portal</h2>
               <form onSubmit={handleAuth} className="space-y-6">
-                <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="w-full bg-black border border-white/10 rounded-xl px-6 py-4 text-white outline-none focus:border-gold-500/50" placeholder="Username or Email"/>
+                <input type="text" required value={email} onChange={(e) => setEmail(e.target.value)} className="w-full bg-black border border-white/10 rounded-xl px-6 py-4 text-white outline-none focus:border-gold-500/50" placeholder="Username or Email"/>
                 <input type="password" required value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-black border border-white/10 rounded-xl px-6 py-4 text-white outline-none focus:border-gold-500/50" placeholder="Passcode"/>
                 <button type="submit" className="w-full py-5 bg-gold-500 text-black font-black rounded-2xl uppercase tracking-[0.2em] text-sm shadow-xl hover:bg-gold-400 transition-all">Authorize</button>
               </form>
