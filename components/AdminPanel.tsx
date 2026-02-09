@@ -1,8 +1,14 @@
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Transaction, TransactionStatus, TransactionType, PaymentGateway, User, Asset } from '../types';
 import { DB } from '../services/db';
-import { CheckCircle, XCircle, CreditCard, ExternalLink, ShieldCheck, Plus, Trash2, Link as LinkIcon, Building2, Hash, Globe, Percent, ArrowDownToLine, ArrowUpToLine, UserCircle, Image as ImageIcon, Wallet, ArrowDownRight, Users, Mail, PieChart, Database, Terminal, FileJson, Trash, Server, Activity, Copy, Check } from 'lucide-react';
+import { 
+  CheckCircle, XCircle, CreditCard, ExternalLink, ShieldCheck, Plus, Trash2, 
+  Link as LinkIcon, Building2, Hash, Globe, Percent, ArrowDownToLine, 
+  ArrowUpToLine, UserCircle, Image as ImageIcon, Wallet, ArrowDownRight, 
+  Users, Mail, PieChart, Database, Terminal, FileJson, Trash, Server, 
+  Activity, Copy, Check, Filter, Calendar, Search
+} from 'lucide-react';
 
 interface AdminPanelProps {
   transactions: Transaction[];
@@ -26,12 +32,26 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   onRemoveGateway
 }) => {
   const [tab, setTab] = useState('requests');
+  const [typeFilter, setTypeFilter] = useState<string>('ALL');
+  const [statusFilter, setStatusFilter] = useState<string>('ALL');
+  
   const [form, setForm] = useState({
     name: '', bankName: '', accountNumber: '', link: '', currency: 'USD',
     merchantName: '', minDeposit: 10, maxDeposit: 1000000, feePercent: 0, logoUrl: ''
   });
   
-  const pendingRequests = transactions.filter(t => t.status === TransactionStatus.PENDING && (t.type === TransactionType.DEPOSIT || t.type === TransactionType.WITHDRAW));
+  const pendingRequests = useMemo(() => 
+    transactions.filter(t => t.status === TransactionStatus.PENDING && (t.type === TransactionType.DEPOSIT || t.type === TransactionType.WITHDRAW)),
+    [transactions]
+  );
+
+  const filteredHistory = useMemo(() => {
+    return transactions.filter(tx => {
+      const matchesType = typeFilter === 'ALL' || tx.type === typeFilter;
+      const matchesStatus = statusFilter === 'ALL' || tx.status === statusFilter;
+      return matchesType && matchesStatus;
+    });
+  }, [transactions, typeFilter, statusFilter]);
 
   const handleAddNew = (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,8 +78,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     <div className="max-w-7xl mx-auto px-4 py-10">
       <div className="flex space-x-12 mb-10 border-b border-white/5 relative overflow-x-auto pb-1 custom-scrollbar">
         <button onClick={() => setTab('requests')} className={`pb-4 px-2 font-black uppercase tracking-[0.2em] text-[11px] whitespace-nowrap transition-all relative ${tab === 'requests' ? 'text-gold-500' : 'text-slate-500 hover:text-slate-300'}`}>
-          Transaction Requests ({pendingRequests.length})
+          Pending Requests ({pendingRequests.length})
           {tab === 'requests' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-gold-500 shadow-[0_0_10px_rgba(234,179,8,0.5)]"></div>}
+        </button>
+        <button onClick={() => setTab('history')} className={`pb-4 px-2 font-black uppercase tracking-[0.2em] text-[11px] whitespace-nowrap transition-all relative ${tab === 'history' ? 'text-gold-500' : 'text-slate-500 hover:text-slate-300'}`}>
+          Transaction History
+          {tab === 'history' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-gold-500 shadow-[0_0_10px_rgba(234,179,8,0.5)]"></div>}
         </button>
         <button onClick={() => setTab('users')} className={`pb-4 px-2 font-black uppercase tracking-[0.2em] text-[11px] whitespace-nowrap transition-all relative ${tab === 'users' ? 'text-gold-500' : 'text-slate-500 hover:text-slate-300'}`}>
           User Management ({users.length})
@@ -72,7 +96,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       </div>
 
       {tab === 'requests' && (
-        <div className="bg-slate-900/50 backdrop-blur-xl rounded-[3rem] border border-white/5 overflow-hidden shadow-2xl">
+        <div className="bg-slate-900/50 backdrop-blur-xl rounded-[3rem] border border-white/5 overflow-hidden shadow-2xl animate-in fade-in duration-500">
           <table className="w-full text-left">
             <thead className="bg-black/40 text-slate-500 text-[10px] uppercase font-black tracking-[0.3em]">
               <tr><th className="p-8">Type / User</th><th className="p-8">Reference / Details</th><th className="p-8 text-center">Amount</th><th className="p-8 text-right">Action</th></tr>
@@ -98,8 +122,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   </td>
                   <td className="p-8 text-center"><div className="font-mono text-xl text-white font-bold">${tx.totalValue.toLocaleString()}</div></td>
                   <td className="p-8 text-right space-x-4">
-                    <button onClick={() => onProcessTransaction(tx.id, TransactionStatus.REJECTED)} className="text-red-500 font-black uppercase text-[10px] bg-red-500/5 px-4 py-2 rounded-xl border border-red-500/10">Reject</button>
-                    <button onClick={() => onProcessTransaction(tx.id, TransactionStatus.APPROVED)} className="text-green-500 font-black uppercase text-[10px] bg-green-500/5 px-4 py-2 rounded-xl border border-green-500/10">Approve</button>
+                    <button onClick={() => onProcessTransaction(tx.id, TransactionStatus.REJECTED)} className="text-red-500 font-black uppercase text-[10px] bg-red-500/5 px-4 py-2 rounded-xl border border-red-500/10 transition-colors hover:bg-red-500 hover:text-white">Reject</button>
+                    <button onClick={() => onProcessTransaction(tx.id, TransactionStatus.APPROVED)} className="text-green-500 font-black uppercase text-[10px] bg-green-500/5 px-4 py-2 rounded-xl border border-green-500/10 transition-colors hover:bg-green-500 hover:text-white">Approve</button>
                   </td>
                 </tr>
               ))}
@@ -111,8 +135,113 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         </div>
       )}
 
+      {tab === 'history' && (
+        <div className="space-y-6 animate-in fade-in duration-500">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-6 bg-slate-900/50 rounded-[2rem] border border-white/5">
+            <div className="flex items-center space-x-4">
+              <div className="p-3 bg-gold-500/10 rounded-xl">
+                <Filter className="text-gold-500" size={20} />
+              </div>
+              <h4 className="text-white font-bold uppercase text-xs tracking-widest">Filter Archive</h4>
+            </div>
+            
+            <div className="flex flex-wrap items-center gap-4">
+              <div className="space-y-1">
+                <p className="text-[9px] text-slate-500 font-black uppercase tracking-widest ml-1">Type</p>
+                <select 
+                  value={typeFilter}
+                  onChange={(e) => setTypeFilter(e.target.value)}
+                  className="bg-black border border-white/10 text-white text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-xl outline-none focus:border-gold-500 transition-colors"
+                >
+                  <option value="ALL">All Types</option>
+                  <option value={TransactionType.BUY}>Buy</option>
+                  <option value={TransactionType.SELL}>Sell</option>
+                  <option value={TransactionType.DEPOSIT}>Deposit</option>
+                  <option value={TransactionType.WITHDRAW}>Withdraw</option>
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <p className="text-[9px] text-slate-500 font-black uppercase tracking-widest ml-1">Status</p>
+                <select 
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="bg-black border border-white/10 text-white text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-xl outline-none focus:border-gold-500 transition-colors"
+                >
+                  <option value="ALL">All Status</option>
+                  <option value={TransactionStatus.APPROVED}>Approved</option>
+                  <option value={TransactionStatus.PENDING}>Pending</option>
+                  <option value={TransactionStatus.REJECTED}>Rejected</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-slate-900/50 backdrop-blur-xl rounded-[3rem] border border-white/5 overflow-hidden shadow-2xl">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead className="bg-black/40 text-slate-500 text-[10px] uppercase font-black tracking-[0.3em]">
+                  <tr>
+                    <th className="p-8">Type / User</th>
+                    <th className="p-8">Date / Time</th>
+                    <th className="p-8 text-center">Amount</th>
+                    <th className="p-8 text-center">Asset/Ref</th>
+                    <th className="p-8 text-right">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {filteredHistory.map(tx => (
+                    <tr key={tx.id} className="hover:bg-white/5 transition-colors group">
+                      <td className="p-8">
+                        <div className="flex items-center space-x-3">
+                          <div className={`p-2 rounded-lg ${
+                            tx.type === TransactionType.DEPOSIT || tx.type === TransactionType.BUY 
+                            ? 'bg-green-500/10 text-green-500' 
+                            : 'bg-red-500/10 text-red-500'
+                          }`}>
+                            {tx.type === TransactionType.DEPOSIT || tx.type === TransactionType.BUY ? <ArrowUpToLine size={16}/> : <ArrowDownToLine size={16}/>}
+                          </div>
+                          <div>
+                            <div className="text-white font-bold">{tx.userName}</div>
+                            <div className="text-[9px] text-slate-500 uppercase font-black tracking-widest">{tx.type}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="p-8">
+                        <div className="text-xs text-slate-300 font-mono">{new Date(tx.date).toLocaleDateString()}</div>
+                        <div className="text-[9px] text-slate-500 font-mono mt-1 uppercase tracking-wider">{new Date(tx.date).toLocaleTimeString()}</div>
+                      </td>
+                      <td className="p-8 text-center">
+                        <div className="font-mono text-lg text-white font-bold">${tx.totalValue.toLocaleString()}</div>
+                        <div className="text-[9px] text-slate-500 font-mono">Qty: {tx.amount.toFixed(4)}</div>
+                      </td>
+                      <td className="p-8 text-center">
+                        <div className="text-[10px] font-black uppercase tracking-widest text-slate-300">{tx.assetType || 'FIAT'}</div>
+                        <div className="text-[9px] text-slate-500 font-mono mt-1 max-w-[120px] truncate mx-auto">{tx.externalTxId || tx.id}</div>
+                      </td>
+                      <td className="p-8 text-right">
+                        <span className={`px-4 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-[0.1em] border ${
+                          tx.status === TransactionStatus.APPROVED ? 'bg-green-500/10 text-green-500 border-green-500/20' :
+                          tx.status === TransactionStatus.PENDING ? 'bg-amber-500/10 text-amber-500 border-amber-500/20' :
+                          'bg-red-500/10 text-red-500 border-red-500/20'
+                        }`}>
+                          {tx.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                  {filteredHistory.length === 0 && (
+                    <tr><td colSpan={5} className="p-32 text-center text-slate-500 font-black uppercase text-xs tracking-widest">No matching history records.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
       {tab === 'users' && (
-        <div className="bg-slate-900/50 backdrop-blur-xl rounded-[3rem] border border-white/5 overflow-hidden shadow-2xl">
+        <div className="bg-slate-900/50 backdrop-blur-xl rounded-[3rem] border border-white/5 overflow-hidden shadow-2xl animate-in fade-in duration-500">
           <table className="w-full text-left">
             <thead className="bg-black/40 text-slate-500 text-[10px] uppercase font-black tracking-[0.3em]">
               <tr><th className="p-8">Identity</th><th className="p-8">Role</th><th className="p-8 text-center">Balance</th><th className="p-8 text-center">Net Worth</th><th className="p-8 text-right">Actions</th></tr>
@@ -124,7 +253,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   <td className="p-8"><span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase ${user.role === 'ADMIN' ? 'bg-red-500/10 text-red-500' : 'bg-gold-500/10 text-gold-500'}`}>{user.role}</span></td>
                   <td className="p-8 text-center"><div className="font-mono text-lg text-white font-bold">${user.balance.toLocaleString()}</div></td>
                   <td className="p-8 text-center"><div className="font-mono text-lg text-gold-500 font-bold">${calculateUserNetWorth(user).toLocaleString()}</div></td>
-                  <td className="p-8 text-right"><button className="p-3 bg-white/5 rounded-xl"><PieChart size={18} /></button></td>
+                  <td className="p-8 text-right"><button className="p-3 bg-white/5 rounded-xl hover:bg-gold-500/10 transition-colors"><PieChart size={18} className="text-slate-400 group-hover:text-gold-500"/></button></td>
                 </tr>
               ))}
             </tbody>
@@ -133,7 +262,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       )}
 
       {tab === 'settings' && (
-        <div className="grid lg:grid-cols-12 gap-10">
+        <div className="grid lg:grid-cols-12 gap-10 animate-in fade-in duration-500">
           <div className="lg:col-span-12 bg-[#0b101b] p-10 rounded-[3rem] border border-white/5 shadow-2xl">
             <h4 className="text-2xl font-bold text-white mb-8 flex items-center"><CreditCard size={28} className="mr-4 text-gold-500"/> Merchant Account Setup</h4>
             <form onSubmit={handleAddNew} className="mb-10 p-8 bg-black/40 rounded-[2.5rem] border border-white/5 space-y-6">

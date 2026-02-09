@@ -11,7 +11,7 @@ import { DepositModal } from './components/DepositModal';
 import { WithdrawModal } from './components/WithdrawModal';
 import { DB } from './services/db';
 import { isSupabaseConfigured } from './services/supabase';
-import { Sparkles, BarChart3, Wallet, ArrowRight, AlertTriangle, Plus, ArrowUpRight } from 'lucide-react';
+import { Sparkles, BarChart3, Wallet, ArrowRight, AlertTriangle, Plus, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 
 const App: React.FC = () => {
   const [currentPage, setCurrentPage] = useState('home');
@@ -88,7 +88,9 @@ const App: React.FC = () => {
           [AssetType.SILVER]: 0,
           [AssetType.PLATINUM]: 0,
           [AssetType.ANTIMATTER]: 0,
-          [AssetType.AI_COMPUTE]: 0
+          [AssetType.AI_COMPUTE]: 0,
+          [AssetType.FUSION_ENERGY]: 0,
+          [AssetType.NEURAL_LINK]: 0
         } as any 
       };
       setUser(admin);
@@ -115,7 +117,9 @@ const App: React.FC = () => {
           [AssetType.SILVER]: 0, 
           [AssetType.PLATINUM]: 0,
           [AssetType.ANTIMATTER]: 0,
-          [AssetType.AI_COMPUTE]: 0
+          [AssetType.AI_COMPUTE]: 0,
+          [AssetType.FUSION_ENERGY]: 0,
+          [AssetType.NEURAL_LINK]: 0
         } as any 
       };
       await DB.syncUser(newUser);
@@ -232,14 +236,32 @@ const App: React.FC = () => {
         {currentPage === 'dashboard' && user && (
           <div className="max-w-7xl mx-auto px-4 py-12">
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-16">
-               <div className="lg:col-span-4 bg-slate-900 border border-gold-500/20 p-10 rounded-[3rem] shadow-2xl">
-                 <div className="flex items-center space-x-3 mb-6">
-                    <Wallet className="text-gold-500" size={24} />
-                    <span className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Available Balance</span>
+               <div className="lg:col-span-4 bg-slate-900 border border-gold-500/20 p-10 rounded-[3rem] shadow-2xl flex flex-col justify-between">
+                 <div>
+                   <div className="flex items-center space-x-3 mb-6">
+                      <Wallet className="text-gold-500" size={24} />
+                      <span className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Available Balance</span>
+                   </div>
+                   <div className="text-5xl font-mono text-white font-black tracking-tight mb-8">${user.balance.toLocaleString()}</div>
                  </div>
-                 <div className="text-5xl font-mono text-white font-black tracking-tight">${user.balance.toLocaleString()}</div>
+                 <div className="grid grid-cols-2 gap-4">
+                   <button 
+                     onClick={() => setDepositModalOpen(true)}
+                     className="flex items-center justify-center space-x-2 py-4 bg-gold-500 text-black font-black uppercase text-[10px] tracking-widest rounded-2xl hover:bg-gold-400 hover:scale-[1.02] transition-all shadow-lg active:scale-95"
+                   >
+                     <Plus size={14} />
+                     <span>Deposit</span>
+                   </button>
+                   <button 
+                     onClick={() => setWithdrawModalOpen(true)}
+                     className="flex items-center justify-center space-x-2 py-4 border border-white/10 text-white font-black uppercase text-[10px] tracking-widest rounded-2xl hover:bg-white/5 hover:scale-[1.02] transition-all active:scale-95"
+                   >
+                     <ArrowDownRight size={14} />
+                     <span>Withdraw</span>
+                   </button>
+                 </div>
               </div>
-              <div className="lg:col-span-8 bg-slate-900 border border-white/10 p-10 rounded-[3rem] shadow-2xl">
+              <div className="lg:col-span-8 bg-slate-900 border border-white/10 p-10 rounded-[3rem] shadow-2xl flex flex-col justify-center">
                  <div className="flex items-center space-x-3 mb-6">
                     <BarChart3 className="text-slate-400" size={24} />
                     <span className="text-slate-500 text-[10px] font-black uppercase tracking-widest">Total Wealth</span>

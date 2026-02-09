@@ -11,6 +11,38 @@ export const INITIAL_ASSETS: Asset[] = [
     color: '#F7931A' 
   },
   { 
+    type: AssetType.ANTIMATTER, 
+    name: 'Anti-Matter Particles', 
+    symbol: 'AM', 
+    price: 625000000, 
+    change24h: 0.05, 
+    color: '#D8B4FE' 
+  },
+  { 
+    type: AssetType.AI_COMPUTE, 
+    name: 'AGI Compute Tokens', 
+    symbol: 'AIX', 
+    price: 125400.00, 
+    change24h: 8.4, 
+    color: '#22D3EE' 
+  },
+  { 
+    type: AssetType.NEURAL_LINK, 
+    name: 'Neural Link Arrays', 
+    symbol: 'NLA', 
+    price: 45200.00, 
+    change24h: -1.2, 
+    color: '#FB7185' 
+  },
+  { 
+    type: AssetType.FUSION_ENERGY, 
+    name: 'Fusion Energy Credits', 
+    symbol: 'FEC', 
+    price: 8500.00, 
+    change24h: 4.7, 
+    color: '#34D399' 
+  },
+  { 
     type: AssetType.DIAMOND, 
     name: 'Blue Diamond', 
     symbol: 'DMD', 
@@ -25,22 +57,6 @@ export const INITIAL_ASSETS: Asset[] = [
     price: 2750.80, 
     change24h: 0.4, 
     color: '#FACC15' 
-  },
-  { 
-    type: AssetType.PLATINUM, 
-    name: 'Platinum', 
-    symbol: 'XPT', 
-    price: 980.50, 
-    change24h: 1.2, 
-    color: '#E5E4E2' 
-  },
-  { 
-    type: AssetType.SILVER, 
-    name: 'Silver', 
-    symbol: 'XAG', 
-    price: 32.40, 
-    change24h: 1.5, 
-    color: '#C0C0C0' 
   }
 ];
 
@@ -56,7 +72,7 @@ export const generateId = () => Math.random().toString(36).substr(2, 9);
 
 export const fluctuatePrices = (assets: Asset[]): Asset[] => {
   return assets.map(asset => {
-    const volatility = asset.type === AssetType.BITCOIN ? 0.015 : 0.005; 
+    const volatility = (asset.type === AssetType.BITCOIN || asset.type === AssetType.AI_COMPUTE || asset.type === AssetType.FUSION_ENERGY) ? 0.015 : 0.005; 
     const change = 1 + (Math.random() * volatility * 2 - volatility);
     const newPrice = asset.price * change;
     return {

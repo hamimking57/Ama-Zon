@@ -6,7 +6,9 @@ export enum AssetType {
   AI_COMPUTE = 'AI_COMPUTE',
   BITCOIN = 'BITCOIN',
   SILVER = 'SILVER',
-  PLATINUM = 'PLATINUM'
+  PLATINUM = 'PLATINUM',
+  FUSION_ENERGY = 'FUSION_ENERGY',
+  NEURAL_LINK = 'NEURAL_LINK'
 }
 
 export enum TransactionType {
