@@ -11,7 +11,7 @@ import { DepositModal } from './components/DepositModal';
 import { WithdrawModal } from './components/WithdrawModal';
 import { DB } from './services/db';
 import { isSupabaseConfigured } from './services/supabase';
-import { Sparkles, BarChart3, Wallet, ArrowRight, AlertTriangle, Plus, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import { Sparkles, BarChart3, Wallet, ArrowRight, AlertTriangle, Plus, ArrowUpRight, ArrowDownRight, UserPlus, LogIn, MapPin, Phone, Mail, Shield } from 'lucide-react';
 
 const App: React.FC = () => {
   const [currentPage, setCurrentPage] = useState('home');
@@ -22,8 +22,19 @@ const App: React.FC = () => {
   const [gateways, setGateways] = useState<PaymentGateway[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Auth States
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  
+  // Signup States
+  const [signupForm, setSignupForm] = useState({
+    name: '',
+    email: '',
+    password: '',
+    address: '',
+    phone: ''
+  });
+
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
   const [transactionType, setTransactionType] = useState<TransactionType>(TransactionType.BUY);
   const [amount, setAmount] = useState<string>('1');
@@ -31,7 +42,6 @@ const App: React.FC = () => {
   const [depositModalOpen, setDepositModalOpen] = useState(false);
   const [withdrawModalOpen, setWithdrawModalOpen] = useState(false);
 
-  // ডাটাবেস থেকে ইনিশিয়াল ডাটা লোড করা
   useEffect(() => {
     const init = async () => {
       setIsLoading(true);
@@ -55,7 +65,6 @@ const App: React.FC = () => {
     init();
   }, []);
 
-  // দামের উঠানামা সিমুলেশন
   useEffect(() => {
     const interval = setInterval(() => setAssets(prev => fluctuatePrices(prev)), 5000);
     return () => clearInterval(interval);
@@ -68,12 +77,11 @@ const App: React.FC = () => {
     return Number(targetUser.balance) + portfolioValue;
   };
 
-  const handleAuth = async (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     const inputEmail = email.trim();
     const inputPass = password.trim();
     
-    // Admin check with specific user credentials
     if (inputEmail === 'emukhan580' && inputPass === 'Imran2015@!@!') {
       const admin: User = { 
         id: 'admin-1', 
@@ -81,52 +89,62 @@ const App: React.FC = () => {
         email: 'emukhan580', 
         role: 'ADMIN', 
         balance: 9999999, 
-        portfolio: {
-          [AssetType.BITCOIN]: 0,
-          [AssetType.DIAMOND]: 0,
-          [AssetType.GOLD]: 0,
-          [AssetType.SILVER]: 0,
-          [AssetType.PLATINUM]: 0,
-          [AssetType.ANTIMATTER]: 0,
-          [AssetType.AI_COMPUTE]: 0,
-          [AssetType.FUSION_ENERGY]: 0,
-          [AssetType.NEURAL_LINK]: 0
-        } as any 
+        portfolio: {} as any 
       };
       setUser(admin);
       setCurrentPage('admin');
       return;
     }
 
-    const normalizedEmail = inputEmail.toLowerCase();
-    const existingUser = users.find(u => u.email.toLowerCase() === normalizedEmail);
+    const existingUser = users.find(u => u.email.toLowerCase() === inputEmail.toLowerCase());
     if (existingUser) {
       setUser(existingUser);
       setCurrentPage('dashboard');
     } else {
-      const newUser: User = { 
-        id: generateId(), 
-        name: inputEmail.includes('@') ? inputEmail.split('@')[0] : inputEmail, 
-        email: inputEmail, 
-        role: 'USER', 
-        balance: 5000, 
-        portfolio: { 
-          [AssetType.BITCOIN]: 0, 
-          [AssetType.GOLD]: 0, 
-          [AssetType.DIAMOND]: 0, 
-          [AssetType.SILVER]: 0, 
-          [AssetType.PLATINUM]: 0,
-          [AssetType.ANTIMATTER]: 0,
-          [AssetType.AI_COMPUTE]: 0,
-          [AssetType.FUSION_ENERGY]: 0,
-          [AssetType.NEURAL_LINK]: 0
-        } as any 
-      };
-      await DB.syncUser(newUser);
-      setUsers(prev => [...prev, newUser]);
-      setUser(newUser);
-      setCurrentPage('dashboard');
+      alert("Invalid credentials. If you are new, please Sign Up.");
     }
+  };
+
+  const handleSignup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const { name, email, address, phone } = signupForm;
+    
+    if (!name || !email || !address || !phone) {
+      alert("Please fill all fields.");
+      return;
+    }
+
+    const normalizedEmail = email.toLowerCase();
+    if (users.some(u => u.email.toLowerCase() === normalizedEmail)) {
+      alert("User with this email already exists.");
+      return;
+    }
+
+    const newUser: User = { 
+      id: generateId(), 
+      name, 
+      email: normalizedEmail, 
+      address,
+      phone,
+      role: 'USER', 
+      balance: 5000, // Welcome bonus
+      portfolio: { 
+        [AssetType.BITCOIN]: 0, 
+        [AssetType.GOLD]: 0, 
+        [AssetType.DIAMOND]: 0, 
+        [AssetType.SILVER]: 0, 
+        [AssetType.PLATINUM]: 0,
+        [AssetType.ANTIMATTER]: 0,
+        [AssetType.AI_COMPUTE]: 0,
+        [AssetType.FUSION_ENERGY]: 0,
+        [AssetType.NEURAL_LINK]: 0
+      } as any 
+    };
+
+    await DB.syncUser(newUser);
+    setUsers(prev => [...prev, newUser]);
+    setUser(newUser);
+    setCurrentPage('dashboard');
   };
 
   const submitTransaction = async () => {
@@ -210,12 +228,20 @@ const App: React.FC = () => {
               <p className="text-xl md:text-2xl text-slate-400 max-w-2xl mx-auto mb-16 font-light">
                 Diamond, Gold, Silver, Platinum and Bitcoin trading for the modern investor.
               </p>
-              <button 
-                onClick={() => setCurrentPage('login')} 
-                className="group relative px-12 py-6 bg-gold-500 text-black font-black rounded-2xl shadow-[0_0_40px_rgba(234,179,8,0.2)] hover:shadow-[0_0_60px_rgba(234,179,8,0.4)] transition-all text-xl"
-              >
-                Start Trading
-              </button>
+              <div className="flex flex-col md:flex-row items-center justify-center space-y-4 md:space-y-0 md:space-x-6">
+                <button 
+                  onClick={() => setCurrentPage('login')} 
+                  className="group relative px-12 py-6 bg-gold-500 text-black font-black rounded-2xl shadow-[0_0_40px_rgba(234,179,8,0.2)] hover:shadow-[0_0_60px_rgba(234,179,8,0.4)] transition-all text-xl w-full md:w-auto"
+                >
+                  Sign In
+                </button>
+                <button 
+                  onClick={() => setCurrentPage('signup')} 
+                  className="px-12 py-6 border-2 border-gold-500/50 text-gold-500 font-black rounded-2xl hover:bg-gold-500/10 transition-all text-xl w-full md:w-auto"
+                >
+                  Join the Club
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -223,18 +249,105 @@ const App: React.FC = () => {
         {currentPage === 'login' && (
           <div className="flex items-center justify-center py-20 px-4">
             <div className="w-full max-w-md bg-slate-900 border border-white/10 p-12 rounded-[3rem] shadow-2xl">
-              <h2 className="text-4xl font-serif font-bold text-white mb-10 text-center">Identity Portal</h2>
-              <form onSubmit={handleAuth} className="space-y-6">
-                <input type="text" required value={email} onChange={(e) => setEmail(e.target.value)} className="w-full bg-black border border-white/10 rounded-xl px-6 py-4 text-white outline-none focus:border-gold-500/50" placeholder="Username or Email"/>
-                <input type="password" required value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-black border border-white/10 rounded-xl px-6 py-4 text-white outline-none focus:border-gold-500/50" placeholder="Passcode"/>
-                <button type="submit" className="w-full py-5 bg-gold-500 text-black font-black rounded-2xl uppercase tracking-[0.2em] text-sm shadow-xl hover:bg-gold-400 transition-all">Authorize</button>
+              <div className="flex justify-center mb-6">
+                <div className="p-4 bg-gold-500/10 rounded-3xl border border-gold-500/20">
+                  <LogIn className="text-gold-500" size={32} />
+                </div>
+              </div>
+              <h2 className="text-4xl font-serif font-bold text-white mb-4 text-center">Welcome Back</h2>
+              <p className="text-slate-500 text-center text-xs uppercase font-black tracking-widest mb-10">Verify your credentials</p>
+              <form onSubmit={handleLogin} className="space-y-6">
+                <div className="relative">
+                  <Mail className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+                  <input type="text" required value={email} onChange={(e) => setEmail(e.target.value)} className="w-full bg-black border border-white/10 rounded-xl px-12 py-4 text-white outline-none focus:border-gold-500/50" placeholder="Username or Email"/>
+                </div>
+                <div className="relative">
+                  <Shield className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+                  <input type="password" required value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-black border border-white/10 rounded-xl px-12 py-4 text-white outline-none focus:border-gold-500/50" placeholder="Passcode"/>
+                </div>
+                <button type="submit" className="w-full py-5 bg-gold-500 text-black font-black rounded-2xl uppercase tracking-[0.2em] text-sm shadow-xl hover:bg-gold-400 transition-all">Authorize Access</button>
               </form>
+              <p className="mt-8 text-center text-slate-400 text-sm">
+                New applicant? <button onClick={() => setCurrentPage('signup')} className="text-gold-500 font-bold hover:underline">Apply for Membership</button>
+              </p>
+            </div>
+          </div>
+        )}
+
+        {currentPage === 'signup' && (
+          <div className="flex items-center justify-center py-20 px-4">
+            <div className="w-full max-w-2xl bg-slate-900 border border-white/10 p-12 rounded-[3rem] shadow-2xl">
+              <div className="flex justify-center mb-6">
+                <div className="p-4 bg-gold-500/10 rounded-3xl border border-gold-500/20">
+                  <UserPlus className="text-gold-500" size={32} />
+                </div>
+              </div>
+              <h2 className="text-4xl font-serif font-bold text-white mb-4 text-center">Membership Application</h2>
+              <p className="text-slate-500 text-center text-xs uppercase font-black tracking-widest mb-10">Join the world's most exclusive asset network</p>
+              <form onSubmit={handleSignup} className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <label className="text-[10px] text-slate-500 font-black uppercase tracking-widest ml-1">Full Identity</label>
+                    <input type="text" required value={signupForm.name} onChange={(e) => setSignupForm({...signupForm, name: e.target.value})} className="w-full bg-black border border-white/10 rounded-xl px-6 py-4 text-white outline-none focus:border-gold-500/50" placeholder="Legal Full Name"/>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] text-slate-500 font-black uppercase tracking-widest ml-1">Contact Email</label>
+                    <div className="relative">
+                      <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-700" size={16} />
+                      <input type="email" required value={signupForm.email} onChange={(e) => setSignupForm({...signupForm, email: e.target.value})} className="w-full bg-black border border-white/10 rounded-xl pl-12 pr-6 py-4 text-white outline-none focus:border-gold-500/50" placeholder="Official Email"/>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] text-slate-500 font-black uppercase tracking-widest ml-1">Home/Office Residence</label>
+                  <div className="relative">
+                    <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-700" size={16} />
+                    <input type="text" required value={signupForm.address} onChange={(e) => setSignupForm({...signupForm, address: e.target.value})} className="w-full bg-black border border-white/10 rounded-xl pl-12 pr-6 py-4 text-white outline-none focus:border-gold-500/50" placeholder="Physical Address for Documentation"/>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <label className="text-[10px] text-slate-500 font-black uppercase tracking-widest ml-1">Secure Line</label>
+                    <div className="relative">
+                      <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-700" size={16} />
+                      <input type="tel" required value={signupForm.phone} onChange={(e) => setSignupForm({...signupForm, phone: e.target.value})} className="w-full bg-black border border-white/10 rounded-xl pl-12 pr-6 py-4 text-white outline-none focus:border-gold-500/50" placeholder="+1 (555) 000-0000"/>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] text-slate-500 font-black uppercase tracking-widest ml-1">Account Passcode</label>
+                    <div className="relative">
+                      <Shield className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-700" size={16} />
+                      <input type="password" required value={signupForm.password} onChange={(e) => setSignupForm({...signupForm, password: e.target.value})} className="w-full bg-black border border-white/10 rounded-xl pl-12 pr-6 py-4 text-white outline-none focus:border-gold-500/50" placeholder="Create Secure Key"/>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-4">
+                  <button type="submit" className="w-full py-5 bg-gold-500 text-black font-black rounded-2xl uppercase tracking-[0.2em] text-sm shadow-xl hover:bg-gold-400 transition-all">Submit Application</button>
+                </div>
+              </form>
+              <p className="mt-8 text-center text-slate-400 text-sm">
+                Already a member? <button onClick={() => setCurrentPage('login')} className="text-gold-500 font-bold hover:underline">Secure Login</button>
+              </p>
             </div>
           </div>
         )}
 
         {currentPage === 'dashboard' && user && (
           <div className="max-w-7xl mx-auto px-4 py-12">
+            <div className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
+              <div>
+                <h2 className="text-4xl font-serif font-bold text-white mb-2">Portfolio Overview</h2>
+                <p className="text-slate-500 text-xs font-black uppercase tracking-[0.2em]">Active Account: {user.name}</p>
+              </div>
+              <div className="px-6 py-3 bg-white/5 border border-white/10 rounded-2xl flex items-center space-x-3">
+                 <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                 <span className="text-[10px] text-slate-300 font-black uppercase tracking-widest">Global Sync Active</span>
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-16">
                <div className="lg:col-span-4 bg-slate-900 border border-gold-500/20 p-10 rounded-[3rem] shadow-2xl flex flex-col justify-between">
                  <div>

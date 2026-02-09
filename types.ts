@@ -37,6 +37,8 @@ export interface User {
   id: string;
   name: string;
   email: string;
+  address?: string;
+  phone?: string;
   role: 'USER' | 'ADMIN';
   balance: number;
   portfolio: Record<AssetType, number>; // Amount owned

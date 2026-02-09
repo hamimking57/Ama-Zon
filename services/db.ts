@@ -26,6 +26,8 @@ export const DB = {
       id: user.id,
       name: user.name,
       email: user.email,
+      address: user.address,
+      phone: user.phone,
       role: user.role,
       balance: user.balance,
       portfolio: user.portfolio
@@ -56,7 +58,7 @@ export const DB = {
       status: t.status,
       date: t.created_at,
       externalTxId: t.external_tx_id,
-      payoutDetails: t.payout_details
+      payout_details: t.payout_details
     })) as Transaction[];
   },
 
@@ -105,13 +107,13 @@ export const DB = {
       active: g.active,
       apiKey: g.api_key,
       bankName: g.bank_name,
-      accountNumber: g.account_number,
-      merchantName: g.merchant_name,
+      account_number: g.account_number,
+      merchant_name: g.merchant_name,
       currency: g.currency,
-      minDeposit: g.min_deposit,
-      maxDeposit: g.max_deposit,
-      feePercent: g.fee_percent,
-      logoUrl: g.logo_url
+      min_deposit: g.min_deposit,
+      max_deposit: g.max_deposit,
+      fee_percent: g.fee_percent,
+      logo_url: g.logo_url
     })) as PaymentGateway[];
   },
 
