@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Asset, User, Transaction, TransactionType, TransactionStatus, PaymentGateway, AssetType } from './types';
 import { INITIAL_ASSETS, fluctuatePrices, generateId } from './services/mockData';
 import { Navbar, BrandLogo } from './components/Navbar';
@@ -10,8 +10,7 @@ import { AIAssistant } from './components/AIAssistant';
 import { DepositModal } from './components/DepositModal';
 import { WithdrawModal } from './components/WithdrawModal';
 import { DB } from './services/db';
-import { isSupabaseConfigured } from './services/supabase';
-import { Sparkles, BarChart3, Wallet, ArrowRight, AlertTriangle, Plus, ArrowUpRight, ArrowDownRight, UserPlus, LogIn, MapPin, Phone, Mail, Shield, RefreshCcw } from 'lucide-react';
+import { Sparkles, BarChart3, Wallet, Plus, ArrowDownRight, Mail, Shield, RefreshCcw, MapPin, Phone } from 'lucide-react';
 
 const App: React.FC = () => {
   const [currentPage, setCurrentPage] = useState('home');
@@ -29,11 +28,7 @@ const App: React.FC = () => {
   
   // Signup States
   const [signupForm, setSignupForm] = useState({
-    name: '',
-    email: '',
-    password: '',
-    address: '',
-    phone: ''
+    name: '', email: '', password: '', address: '', phone: ''
   });
 
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
@@ -42,6 +37,24 @@ const App: React.FC = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [depositModalOpen, setDepositModalOpen] = useState(false);
   const [withdrawModalOpen, setWithdrawModalOpen] = useState(false);
+
+  // Initial Load & Session Recovery
+  useEffect(() => {
+    const init = async () => {
+      setIsLoading(true);
+      const savedUser = localStorage.getItem('ama_session_user');
+      
+      if (savedUser) {
+        const parsed = JSON.parse(savedUser);
+        setUser(parsed);
+        setCurrentPage(parsed.role === 'ADMIN' ? 'admin' : 'dashboard');
+      }
+
+      await fetchData(true);
+      setIsLoading(false);
+    };
+    init();
+  }, []);
 
   // Global Data Fetcher
   const fetchData = async (silent = false) => {
@@ -53,36 +66,33 @@ const App: React.FC = () => {
         DB.fetchGateways()
       ]);
       
-      // Only update state if we actually got data back to avoid clearing the screen
-      if (u && u.length > 0) setUsers(u);
-      if (t) setTransactions(t);
-      if (g && g.length > 0) setGateways(g);
+      setUsers(u);
+      setTransactions(t);
+      if (g.length > 0) setGateways(g);
       
-      // Session Persistence: Try to restore session if user exists in fresh users list
-      const savedUserId = localStorage.getItem('active_session_id');
-      if (savedUserId && !user) {
-        const sessionUser = u.find(x => x.id === savedUserId);
-        if (sessionUser) {
-          setUser(sessionUser);
-          setCurrentPage(sessionUser.role === 'ADMIN' ? 'admin' : 'dashboard');
+      // Sync current logged in user with latest database state
+      const currentSessionId = localStorage.getItem('ama_session_user_id');
+      if (currentSessionId) {
+        const freshUser = u.find(x => x.id === currentSessionId);
+        // Master Admin case
+        if (currentSessionId === 'admin-1') {
+          // Keep admin session as is
+        } else if (freshUser) {
+          setUser(freshUser);
+          localStorage.setItem('ama_session_user', JSON.stringify(freshUser));
         }
-      } else if (user && user.role !== 'ADMIN') {
-        const freshUser = u.find(x => x.id === user.id);
-        if (freshUser) setUser(freshUser);
       }
     } catch (err) {
-      console.error("Data fetch error:", err);
+      console.error("Critical Sync Error:", err);
     } finally {
       setIsRefreshing(false);
-      setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchData();
-    const interval = setInterval(() => setAssets(prev => fluctuatePrices(prev)), 10000);
+    const interval = setInterval(() => setAssets(prev => fluctuatePrices(prev)), 15000);
     return () => clearInterval(interval);
-  }, [user?.id]); // Re-sync if user changes
+  }, []);
 
   const calculateNetWorth = (targetUser: User) => {
     const portfolioValue = assets.reduce((acc, asset) => {
@@ -96,140 +106,90 @@ const App: React.FC = () => {
     const inputEmail = email.trim();
     const inputPass = password.trim();
     
-    // Master Admin Access
     if (inputEmail === 'emukhan580' && inputPass === 'Imran2015@!@!') {
       const admin: User = { 
-        id: 'admin-1', 
-        name: 'Master Admin', 
-        email: 'emukhan580', 
-        role: 'ADMIN', 
-        balance: 9999999, 
-        portfolio: {} as any 
+        id: 'admin-1', name: 'Master Admin', email: 'emukhan580', 
+        role: 'ADMIN', balance: 9999999, portfolio: {} as any 
       };
       setUser(admin);
-      localStorage.setItem('active_session_id', admin.id);
+      localStorage.setItem('ama_session_user', JSON.stringify(admin));
+      localStorage.setItem('ama_session_user_id', admin.id);
       setCurrentPage('admin');
       fetchData(true);
       return;
     }
 
-    const existingUser = users.find(u => u.email.toLowerCase() === inputEmail.toLowerCase());
-    if (existingUser) {
-      setUser(existingUser);
-      localStorage.setItem('active_session_id', existingUser.id);
+    const foundUser = users.find(u => u.email.toLowerCase() === inputEmail.toLowerCase());
+    if (foundUser) {
+      setUser(foundUser);
+      localStorage.setItem('ama_session_user', JSON.stringify(foundUser));
+      localStorage.setItem('ama_session_user_id', foundUser.id);
       setCurrentPage('dashboard');
     } else {
-      alert("Invalid credentials. Please Sign Up or try again.");
+      alert("Invalid credentials. Please Sign Up.");
     }
   };
 
   const handleLogout = () => {
     setUser(null);
-    localStorage.removeItem('active_session_id');
+    localStorage.removeItem('ama_session_user');
+    localStorage.removeItem('ama_session_user_id');
     setCurrentPage('home');
   };
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
-    const { name, email, address, phone } = signupForm;
-    
-    if (!name || !email || !address || !phone) {
-      alert("Please fill all identity fields.");
-      return;
-    }
-
-    const normalizedEmail = email.toLowerCase();
-    if (users.some(u => u.email.toLowerCase() === normalizedEmail)) {
-      alert("This email is already registered.");
-      return;
-    }
+    const { name, email: sEmail, address, phone } = signupForm;
+    if (!name || !sEmail) { alert("Fill required fields"); return; }
 
     const newUser: User = { 
-      id: generateId(), 
-      name, 
-      email: normalizedEmail, 
-      address,
-      phone,
-      role: 'USER', 
-      balance: 0, 
-      portfolio: { 
-        [AssetType.BITCOIN]: 0, 
-        [AssetType.GOLD]: 0, 
-        [AssetType.DIAMOND]: 0, 
-        [AssetType.SILVER]: 0, 
-        [AssetType.PLATINUM]: 0,
-        [AssetType.ANTIMATTER]: 0,
-        [AssetType.AI_COMPUTE]: 0,
-        [AssetType.FUSION_ENERGY]: 0,
-        [AssetType.NEURAL_LINK]: 0
-      } as any 
+      id: generateId(), name, email: sEmail.toLowerCase(), 
+      address, phone, role: 'USER', balance: 0, 
+      portfolio: { [AssetType.BITCOIN]: 0, [AssetType.GOLD]: 0, [AssetType.DIAMOND]: 0, [AssetType.SILVER]: 0, [AssetType.PLATINUM]: 0 } as any 
     };
 
     try {
       await DB.syncUser(newUser);
       setUsers(prev => [...prev, newUser]);
       setUser(newUser);
-      localStorage.setItem('active_session_id', newUser.id);
+      localStorage.setItem('ama_session_user', JSON.stringify(newUser));
+      localStorage.setItem('ama_session_user_id', newUser.id);
       setCurrentPage('dashboard');
     } catch (err) {
-      console.error("Signup failure:", err);
-      alert("Application failed. Data could not be saved.");
+      alert("Registration failed. Check DB connection.");
     }
-  };
-
-  const submitTransaction = async () => {
-    if (!user || !selectedAsset) return;
-    const qty = parseFloat(amount);
-    const totalCost = qty * selectedAsset.price;
-    
-    if (transactionType === TransactionType.BUY && totalCost > user.balance) {
-      alert("Insufficient Liquid Balance.");
-      return;
-    }
-
-    const newTx: Transaction = {
-      id: generateId(), userId: user.id, userName: user.name, assetType: selectedAsset.type,
-      amount: qty, priceAtRequest: selectedAsset.price, totalValue: totalCost,
-      type: transactionType, status: TransactionStatus.APPROVED, date: new Date().toISOString()
-    };
-
-    await DB.addTransaction(newTx);
-    setTransactions(prev => [newTx, ...prev]);
-    
-    const updatedUser = { ...user };
-    if (transactionType === TransactionType.BUY) {
-      updatedUser.balance -= totalCost;
-      updatedUser.portfolio[selectedAsset.type] = (updatedUser.portfolio[selectedAsset.type] || 0) + qty;
-    } else {
-      updatedUser.balance += totalCost;
-      updatedUser.portfolio[selectedAsset.type] = Math.max(0, (updatedUser.portfolio[selectedAsset.type] || 0) - qty);
-    }
-    
-    setUser(updatedUser);
-    await DB.syncUser(updatedUser);
-    setModalOpen(false);
   };
 
   const handleDeposit = async (amt: number, ref: string) => {
     if (!user) return;
-    const tx: Transaction = { id: generateId(), userId: user.id, userName: user.name, amount: amt, priceAtRequest: 1, totalValue: amt, type: TransactionType.DEPOSIT, status: TransactionStatus.PENDING, date: new Date().toISOString(), externalTxId: ref };
+    const tx: Transaction = { 
+      id: generateId(), userId: user.id, userName: user.name, 
+      amount: amt, priceAtRequest: 1, totalValue: amt, 
+      type: TransactionType.DEPOSIT, status: TransactionStatus.PENDING, 
+      date: new Date().toISOString(), externalTxId: ref 
+    };
+    
     await DB.addTransaction(tx);
-    setTransactions(prev => [tx, ...prev]);
-    alert("Deposit request submitted for audit. Our settlement team will verify the Reference ID within minutes.");
-    fetchData(true);
+    alert("Deposit submitted. Admin will verify Reference: " + ref);
+    await fetchData(true); // Force re-sync so admin sees it instantly
   };
 
   const handleWithdraw = async (amt: number, details: string) => {
     if (!user) return;
-    const tx: Transaction = { id: generateId(), userId: user.id, userName: user.name, amount: amt, priceAtRequest: 1, totalValue: amt, type: TransactionType.WITHDRAW, status: TransactionStatus.PENDING, date: new Date().toISOString(), payoutDetails: details };
-    await DB.addTransaction(tx);
-    setTransactions(prev => [tx, ...prev]);
+    const tx: Transaction = { 
+      id: generateId(), userId: user.id, userName: user.name, 
+      amount: amt, priceAtRequest: 1, totalValue: amt, 
+      type: TransactionType.WITHDRAW, status: TransactionStatus.PENDING, 
+      date: new Date().toISOString(), payoutDetails: details 
+    };
     
+    await DB.addTransaction(tx);
     const updatedUser = { ...user, balance: user.balance - amt };
-    setUser(updatedUser);
     await DB.syncUser(updatedUser);
-    alert("Withdrawal request submitted. Funds are held in escrow until approval.");
-    fetchData(true);
+    setUser(updatedUser);
+    localStorage.setItem('ama_session_user', JSON.stringify(updatedUser));
+    alert("Withdrawal submitted. Amount deducted from balance.");
+    await fetchData(true);
   };
 
   const handleProcessTransaction = async (id: string, status: TransactionStatus) => {
@@ -246,36 +206,42 @@ const App: React.FC = () => {
         } else if (status === TransactionStatus.REJECTED && tx.type === TransactionType.WITHDRAW) {
           newBalance += tx.amount;
         }
-
         const updated = { ...targetUser, balance: newBalance };
         await DB.syncUser(updated);
-        fetchData(true);
       }
+      await fetchData(true);
     } catch (err) {
       alert("Error processing transaction.");
     }
   };
 
-  const handleAdminUpdateUser = async (updated: User) => {
+  // handleAdminUpdateUser: Updates user data in database and refreshes local state
+  const handleAdminUpdateUser = async (updatedUser: User) => {
     try {
-      await DB.syncUser(updated);
-      fetchData(true);
+      await DB.syncUser(updatedUser);
+      await fetchData(true);
     } catch (err) {
-      alert("User update failed.");
+      alert("Failed to update user.");
     }
   };
 
+  // handleAdminDeleteUser: Removes user from database and logs them out if it was the current session
   const handleAdminDeleteUser = async (userId: string) => {
     try {
       await DB.deleteUser(userId);
-      fetchData(true);
-      alert("Member account deleted successfully.");
+      await fetchData(true);
+      if (user && user.id === userId) {
+        handleLogout();
+      }
     } catch (err) {
-      alert("Error deleting user.");
+      alert("Failed to delete user.");
     }
   };
 
-  if (isLoading) return <div className="min-h-screen bg-black flex items-center justify-center font-mono text-gold-500 animate-pulse uppercase tracking-[0.5em]">Establishing Secure Link...</div>;
+  if (isLoading) return <div className="min-h-screen bg-black flex flex-col items-center justify-center font-mono text-gold-500 animate-pulse">
+    <BrandLogo className="w-20 h-20 mb-8" />
+    <span className="uppercase tracking-[0.5em]">Syncing Secure Data...</span>
+  </div>;
 
   return (
     <div className="min-h-screen flex flex-col bg-black text-slate-100 font-sans selection:bg-gold-500/30 overflow-x-hidden">
@@ -297,30 +263,12 @@ const App: React.FC = () => {
                 <Sparkles className="text-gold-500" size={14}/>
                 <span className="text-gold-500 text-[10px] font-black uppercase tracking-widest">Premium Asset Management</span>
               </div>
-              
-              <div className="flex justify-center mb-10">
-                <BrandLogo className="w-24 h-24 md:w-32 md:h-32 drop-shadow-[0_0_30px_rgba(234,179,8,0.3)]" />
-              </div>
-
-              <h1 className="text-6xl md:text-9xl font-serif font-bold text-white mb-8 tracking-tighter leading-none">
-                Elite <span className="text-gold-500 italic">Exchange.</span>
-              </h1>
-              <p className="text-xl md:text-2xl text-slate-400 max-w-2xl mx-auto mb-16 font-light">
-                Diamond, Gold, Silver, Platinum and Bitcoin trading for the modern investor.
-              </p>
+              <div className="flex justify-center mb-10"><BrandLogo className="w-24 h-24 md:w-32 md:h-32 drop-shadow-[0_0_30px_rgba(234,179,8,0.3)]" /></div>
+              <h1 className="text-6xl md:text-9xl font-serif font-bold text-white mb-8 tracking-tighter leading-none">Elite <span className="text-gold-500 italic">Exchange.</span></h1>
+              <p className="text-xl md:text-2xl text-slate-400 max-w-2xl mx-auto mb-16 font-light">Diamond, Gold, Silver, Platinum and Bitcoin trading for the modern investor.</p>
               <div className="flex flex-col md:flex-row items-center justify-center space-y-4 md:space-y-0 md:space-x-6">
-                <button 
-                  onClick={() => setCurrentPage('login')} 
-                  className="group relative px-12 py-6 bg-gold-500 text-black font-black rounded-2xl shadow-[0_0_40px_rgba(234,179,8,0.2)] hover:shadow-[0_0_60px_rgba(234,179,8,0.4)] transition-all text-xl w-full md:w-auto"
-                >
-                  Sign In
-                </button>
-                <button 
-                  onClick={() => setCurrentPage('signup')} 
-                  className="px-12 py-6 border-2 border-gold-500/50 text-gold-500 font-black rounded-2xl hover:bg-gold-500/10 transition-all text-xl w-full md:w-auto"
-                >
-                  Apply Now
-                </button>
+                <button onClick={() => setCurrentPage('login')} className="px-12 py-6 bg-gold-500 text-black font-black rounded-2xl shadow-xl transition-all text-xl w-full md:w-auto">Sign In</button>
+                <button onClick={() => setCurrentPage('signup')} className="px-12 py-6 border-2 border-gold-500/50 text-gold-500 font-black rounded-2xl transition-all text-xl w-full md:w-auto">Apply Now</button>
               </div>
             </div>
           </div>
@@ -329,27 +277,13 @@ const App: React.FC = () => {
         {currentPage === 'login' && (
           <div className="flex items-center justify-center py-20 px-4">
             <div className="w-full max-w-md bg-slate-900 border border-white/10 p-12 rounded-[3rem] shadow-2xl">
-              <div className="flex justify-center mb-6">
-                <div className="p-4 bg-gold-500/10 rounded-3xl border border-gold-500/20">
-                  <BrandLogo className="w-12 h-12" />
-                </div>
-              </div>
-              <h2 className="text-4xl font-serif font-bold text-white mb-4 text-center">Welcome Back</h2>
-              <p className="text-slate-500 text-center text-xs uppercase font-black tracking-widest mb-10">Verify your credentials</p>
+              <h2 className="text-4xl font-serif font-bold text-white mb-10 text-center">Welcome Back</h2>
               <form onSubmit={handleLogin} className="space-y-6">
-                <div className="relative">
-                  <Mail className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
-                  <input type="text" required value={email} onChange={(e) => setEmail(e.target.value)} className="w-full bg-black border border-white/10 rounded-xl px-12 py-4 text-white outline-none focus:border-gold-500/50" placeholder="Username or Email"/>
-                </div>
-                <div className="relative">
-                  <Shield className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
-                  <input type="password" required value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-black border border-white/10 rounded-xl px-12 py-4 text-white outline-none focus:border-gold-500/50" placeholder="Passcode"/>
-                </div>
-                <button type="submit" className="w-full py-5 bg-gold-500 text-black font-black rounded-2xl uppercase tracking-[0.2em] text-sm shadow-xl hover:bg-gold-400 transition-all">Authorize Access</button>
+                <input type="text" required value={email} onChange={(e) => setEmail(e.target.value)} className="w-full bg-black border border-white/10 rounded-xl px-6 py-4 text-white outline-none focus:border-gold-500/50" placeholder="Username or Email"/>
+                <input type="password" required value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-black border border-white/10 rounded-xl px-6 py-4 text-white outline-none focus:border-gold-500/50" placeholder="Passcode"/>
+                <button type="submit" className="w-full py-5 bg-gold-500 text-black font-black rounded-2xl uppercase tracking-widest shadow-xl">Authorize Access</button>
               </form>
-              <p className="mt-8 text-center text-slate-400 text-sm">
-                New applicant? <button onClick={() => setCurrentPage('signup')} className="text-gold-500 font-bold hover:underline">Apply for Membership</button>
-              </p>
+              <p className="mt-8 text-center text-slate-400 text-sm">New applicant? <button onClick={() => setCurrentPage('signup')} className="text-gold-500 font-bold hover:underline">Apply</button></p>
             </div>
           </div>
         )}
@@ -357,60 +291,20 @@ const App: React.FC = () => {
         {currentPage === 'signup' && (
           <div className="flex items-center justify-center py-20 px-4">
             <div className="w-full max-w-2xl bg-slate-900 border border-white/10 p-12 rounded-[3rem] shadow-2xl">
-              <div className="flex justify-center mb-6">
-                <div className="p-4 bg-gold-500/10 rounded-3xl border border-gold-500/20">
-                  <BrandLogo className="w-12 h-12" />
-                </div>
-              </div>
-              <h2 className="text-4xl font-serif font-bold text-white mb-4 text-center">Membership Application</h2>
-              <p className="text-slate-500 text-center text-xs uppercase font-black tracking-widest mb-10">Join the world's most exclusive asset network</p>
+              <h2 className="text-4xl font-serif font-bold text-white mb-10 text-center">Membership Application</h2>
               <form onSubmit={handleSignup} className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <label className="text-[10px] text-slate-500 font-black uppercase tracking-widest ml-1">Full Identity</label>
-                    <input type="text" required value={signupForm.name} onChange={(e) => setSignupForm({...signupForm, name: e.target.value})} className="w-full bg-black border border-white/10 rounded-xl px-6 py-4 text-white outline-none focus:border-gold-500/50" placeholder="Legal Full Name"/>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] text-slate-500 font-black uppercase tracking-widest ml-1">Contact Email</label>
-                    <div className="relative">
-                      <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-700" size={16} />
-                      <input type="email" required value={signupForm.email} onChange={(e) => setSignupForm({...signupForm, email: e.target.value})} className="w-full bg-black border border-white/10 rounded-xl pl-12 pr-6 py-4 text-white outline-none focus:border-gold-500/50" placeholder="Official Email"/>
-                    </div>
-                  </div>
+                  <input type="text" required value={signupForm.name} onChange={(e) => setSignupForm({...signupForm, name: e.target.value})} className="w-full bg-black border border-white/10 rounded-xl px-6 py-4 text-white outline-none" placeholder="Legal Full Name"/>
+                  <input type="email" required value={signupForm.email} onChange={(e) => setSignupForm({...signupForm, email: e.target.value})} className="w-full bg-black border border-white/10 rounded-xl px-6 py-4 text-white outline-none" placeholder="Official Email"/>
                 </div>
-
-                <div className="space-y-2">
-                  <label className="text-[10px] text-slate-500 font-black uppercase tracking-widest ml-1">Home/Office Residence</label>
-                  <div className="relative">
-                    <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-700" size={16} />
-                    <input type="text" required value={signupForm.address} onChange={(e) => setSignupForm({...signupForm, address: e.target.value})} className="w-full bg-black border border-white/10 rounded-xl pl-12 pr-6 py-4 text-white outline-none focus:border-gold-500/50" placeholder="Physical Address for Documentation"/>
-                  </div>
-                </div>
-
+                <input type="text" required value={signupForm.address} onChange={(e) => setSignupForm({...signupForm, address: e.target.value})} className="w-full bg-black border border-white/10 rounded-xl px-6 py-4 text-white outline-none" placeholder="Physical Address"/>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <label className="text-[10px] text-slate-500 font-black uppercase tracking-widest ml-1">Secure Line</label>
-                    <div className="relative">
-                      <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-700" size={16} />
-                      <input type="tel" required value={signupForm.phone} onChange={(e) => setSignupForm({...signupForm, phone: e.target.value})} className="w-full bg-black border border-white/10 rounded-xl pl-12 pr-6 py-4 text-white outline-none focus:border-gold-500/50" placeholder="+1 (555) 000-0000"/>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] text-slate-500 font-black uppercase tracking-widest ml-1">Account Passcode</label>
-                    <div className="relative">
-                      <Shield className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-700" size={16} />
-                      <input type="password" required value={signupForm.password} onChange={(e) => setSignupForm({...signupForm, password: e.target.value})} className="w-full bg-black border border-white/10 rounded-xl pl-12 pr-6 py-4 text-white outline-none focus:border-gold-500/50" placeholder="Create Secure Key"/>
-                    </div>
-                  </div>
+                  <input type="tel" required value={signupForm.phone} onChange={(e) => setSignupForm({...signupForm, phone: e.target.value})} className="w-full bg-black border border-white/10 rounded-xl px-6 py-4 text-white outline-none" placeholder="+1 (555) 000-0000"/>
+                  <input type="password" required value={signupForm.password} onChange={(e) => setSignupForm({...signupForm, password: e.target.value})} className="w-full bg-black border border-white/10 rounded-xl px-6 py-4 text-white outline-none" placeholder="Create Secure Key"/>
                 </div>
-
-                <div className="pt-4">
-                  <button type="submit" className="w-full py-5 bg-gold-500 text-black font-black rounded-2xl uppercase tracking-[0.2em] text-sm shadow-xl hover:bg-gold-400 transition-all">Submit Application</button>
-                </div>
+                <button type="submit" className="w-full py-5 bg-gold-500 text-black font-black rounded-2xl uppercase tracking-widest shadow-xl">Submit Application</button>
               </form>
-              <p className="mt-8 text-center text-slate-400 text-sm">
-                Already a member? <button onClick={() => setCurrentPage('login')} className="text-gold-500 font-bold hover:underline">Secure Login</button>
-              </p>
+              <p className="mt-8 text-center text-slate-400 text-sm">Already a member? <button onClick={() => setCurrentPage('login')} className="text-gold-500 font-bold hover:underline">Secure Login</button></p>
             </div>
           </div>
         )}
@@ -422,52 +316,27 @@ const App: React.FC = () => {
                 <h2 className="text-4xl font-serif font-bold text-white mb-2">Portfolio Overview</h2>
                 <p className="text-slate-500 text-xs font-black uppercase tracking-[0.2em]">Active Account: {user.name}</p>
               </div>
-              <button 
-                onClick={() => fetchData()}
-                className={`p-3 bg-white/5 border border-white/10 rounded-2xl text-slate-400 hover:text-white transition flex items-center space-x-2 ${isRefreshing ? 'animate-spin' : ''}`}
-                title="Refresh Assets"
-              >
-                <RefreshCcw size={18} />
-              </button>
+              <button onClick={() => fetchData()} className={`p-3 bg-white/5 border border-white/10 rounded-2xl text-slate-400 hover:text-white transition flex items-center space-x-2 ${isRefreshing ? 'animate-spin' : ''}`}><RefreshCcw size={18} /></button>
             </div>
-
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-16">
                <div className="lg:col-span-4 bg-slate-900 border border-gold-500/20 p-10 rounded-[3rem] shadow-2xl flex flex-col justify-between">
                  <div>
-                   <div className="flex items-center space-x-3 mb-6">
-                      <Wallet className="text-gold-500" size={24} />
-                      <span className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Liquid Balance</span>
-                   </div>
+                   <div className="flex items-center space-x-3 mb-6"><Wallet className="text-gold-500" size={24} /><span className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Liquid Balance</span></div>
                    <div className="text-5xl font-mono text-white font-black tracking-tight mb-8">${Number(user.balance).toLocaleString()}</div>
                  </div>
                  <div className="grid grid-cols-2 gap-4">
-                   <button 
-                     onClick={() => setDepositModalOpen(true)}
-                     className="flex items-center justify-center space-x-2 py-4 bg-gold-500 text-black font-black uppercase text-[10px] tracking-widest rounded-2xl hover:bg-gold-400 hover:scale-[1.02] transition-all shadow-lg active:scale-95"
-                   >
-                     <Plus size={14} />
-                     <span>Deposit</span>
-                   </button>
-                   <button 
-                     onClick={() => setWithdrawModalOpen(true)}
-                     className="flex items-center justify-center space-x-2 py-4 border border-white/10 text-white font-black uppercase text-[10px] tracking-widest rounded-2xl hover:bg-white/5 hover:scale-[1.02] transition-all active:scale-95"
-                   >
-                     <ArrowDownRight size={14} />
-                     <span>Withdraw</span>
-                   </button>
+                   <button onClick={() => setDepositModalOpen(true)} className="py-4 bg-gold-500 text-black font-black uppercase text-[10px] tracking-widest rounded-2xl shadow-lg transition-all"><Plus size={14} className="inline mr-2"/>Deposit</button>
+                   <button onClick={() => setWithdrawModalOpen(true)} className="py-4 border border-white/10 text-white font-black uppercase text-[10px] tracking-widest rounded-2xl transition-all"><ArrowDownRight size={14} className="inline mr-2"/>Withdraw</button>
                  </div>
               </div>
               <div className="lg:col-span-8 bg-slate-900 border border-white/10 p-10 rounded-[3rem] shadow-2xl flex flex-col justify-center">
-                 <div className="flex items-center space-x-3 mb-6">
-                    <BarChart3 className="text-slate-400" size={24} />
-                    <span className="text-slate-500 text-[10px] font-black uppercase tracking-widest">Total Wealth</span>
-                 </div>
+                 <div className="flex items-center space-x-3 mb-6"><BarChart3 className="text-slate-400" size={24} /><span className="text-slate-500 text-[10px] font-black uppercase tracking-widest">Total Wealth</span></div>
                  <div className="text-5xl font-mono text-gold-500 font-black tracking-tight">${calculateNetWorth(user).toLocaleString()}</div>
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
               {assets.map(asset => (
-                <AssetCard key={asset.type} asset={asset} userOwnedAmount={user.portfolio[asset.type] || 0} onBuy={(a) => { setSelectedAsset(a); setTransactionType(TransactionType.BUY); setAmount('1'); setModalOpen(true); }} onSell={(a) => { setSelectedAsset(a); setTransactionType(TransactionType.SELL); setAmount('1'); setModalOpen(true); }} />
+                <AssetCard key={asset.type} asset={asset} userOwnedAmount={user.portfolio[asset.type] || 0} onBuy={() => { setSelectedAsset(asset); setTransactionType(TransactionType.BUY); setModalOpen(true); }} onSell={() => { setSelectedAsset(asset); setTransactionType(TransactionType.SELL); setModalOpen(true); }} />
               ))}
             </div>
           </div>
@@ -489,13 +358,13 @@ const App: React.FC = () => {
               if (gw) {
                 const updated = { ...gw, active: a };
                 await DB.saveGateway(updated);
-                setGateways(prev => prev.map(g => g.name === n ? updated : g));
+                await fetchData(true);
               }
             }} 
             onAddGateway={async (g) => {
               const newGw = { ...g, apiKey: generateId() };
               await DB.saveGateway(newGw);
-              setGateways(prev => [...prev, newGw]);
+              await fetchData(true);
             }} 
             onRemoveGateway={(n) => setGateways(prev => prev.filter(g => g.name !== n))} 
           />
@@ -518,7 +387,24 @@ const App: React.FC = () => {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <button onClick={() => setModalOpen(false)} className="py-4 rounded-2xl text-slate-500 font-black uppercase text-[10px] tracking-widest hover:bg-white/5 transition-all">Cancel</button>
-                <button onClick={submitTransaction} className="py-4 rounded-2xl bg-gold-500 text-black font-black uppercase text-[10px] tracking-widest shadow-lg hover:bg-gold-400 transition-all">Execute</button>
+                <button onClick={async () => {
+                  const qty = parseFloat(amount);
+                  const cost = qty * selectedAsset.price;
+                  if (transactionType === TransactionType.BUY && cost > user.balance) { alert("Insufficient Balance"); return; }
+                  const updatedUser = { ...user };
+                  if (transactionType === TransactionType.BUY) {
+                    updatedUser.balance -= cost;
+                    updatedUser.portfolio[selectedAsset.type] = (updatedUser.portfolio[selectedAsset.type] || 0) + qty;
+                  } else {
+                    updatedUser.balance += cost;
+                    updatedUser.portfolio[selectedAsset.type] = Math.max(0, (updatedUser.portfolio[selectedAsset.type] || 0) - qty);
+                  }
+                  await DB.syncUser(updatedUser);
+                  setUser(updatedUser);
+                  localStorage.setItem('ama_session_user', JSON.stringify(updatedUser));
+                  setModalOpen(false);
+                  fetchData(true);
+                }} className="py-4 rounded-2xl bg-gold-500 text-black font-black uppercase text-[10px] tracking-widest shadow-lg hover:bg-gold-400 transition-all">Execute</button>
               </div>
             </div>
           </div>

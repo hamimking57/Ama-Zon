@@ -2,9 +2,15 @@
 import { User, Transaction, PaymentGateway } from '../types';
 import { supabase, isSupabaseConfigured } from './supabase';
 
-// Helper to manage local storage backups
+// High-integrity Local Backup system
 const LocalBackup = {
-  get: (key: string) => JSON.parse(localStorage.getItem(key) || '[]'),
+  get: (key: string) => {
+    try {
+      return JSON.parse(localStorage.getItem(key) || '[]');
+    } catch (e) {
+      return [];
+    }
+  },
   set: (key: string, data: any) => localStorage.setItem(key, JSON.stringify(data)),
   saveItem: (key: string, item: any, idKey: string = 'id') => {
     const data = LocalBackup.get(key);
@@ -17,26 +23,31 @@ const LocalBackup = {
 export const DB = {
   // --- USERS ---
   fetchUsers: async (): Promise<User[]> => {
-    const localData = LocalBackup.get('local_users');
+    const localData = LocalBackup.get('ama_users');
     if (!isSupabaseConfigured || !supabase) return localData;
 
     try {
       const { data, error } = await supabase.from('users').select('*');
       if (error) throw error;
       if (data && data.length > 0) {
-        LocalBackup.set('local_users', data); // Update local backup with cloud data
+        LocalBackup.set('ama_users', data);
         return data as User[];
       }
       return localData;
     } catch (err) {
-      console.warn("DB Fetch Users failed, using local backup:", err);
+      console.warn("Using local users backup:", err);
       return localData;
     }
   },
 
   syncUser: async (user: User) => {
-    // Always save to local first for instant persistence
-    LocalBackup.saveItem('local_users', user);
+    LocalBackup.saveItem('ama_users', user);
+    
+    // Also update session user if it's the current user
+    const currentId = localStorage.getItem('ama_session_user_id');
+    if (currentId === user.id) {
+      localStorage.setItem('ama_session_user', JSON.stringify(user));
+    }
 
     if (!isSupabaseConfigured || !supabase) return;
 
@@ -50,21 +61,20 @@ export const DB = {
         role: user.role,
         balance: user.balance,
         portfolio: user.portfolio
-      });
+      }, { onConflict: 'id' });
       if (error) throw error;
     } catch (err) {
-      console.error("Cloud Sync User Error:", err);
+      console.error("User Cloud Sync Failed:", err);
     }
   },
 
   deleteUser: async (userId: string) => {
-    const local = LocalBackup.get('local_users').filter((u: any) => u.id !== userId);
-    LocalBackup.set('local_users', local);
+    const local = LocalBackup.get('ama_users').filter((u: any) => u.id !== userId);
+    LocalBackup.set('ama_users', local);
 
     if (!isSupabaseConfigured || !supabase) return;
     try {
-      const { error } = await supabase.from('users').delete().eq('id', userId);
-      if (error) throw error;
+      await supabase.from('users').delete().eq('id', userId);
     } catch (err) {
       console.error("Cloud Delete User Error:", err);
     }
@@ -72,7 +82,7 @@ export const DB = {
 
   // --- TRANSACTIONS ---
   fetchTransactions: async (): Promise<Transaction[]> => {
-    const localTx = LocalBackup.get('local_txs');
+    const localTx = LocalBackup.get('ama_txs');
     if (!isSupabaseConfigured || !supabase) return localTx;
 
     try {
@@ -98,21 +108,20 @@ export const DB = {
           externalTxId: t.external_tx_id,
           payoutDetails: t.payout_details
         }));
-        LocalBackup.set('local_txs', formatted);
+        LocalBackup.set('ama_txs', formatted);
         return formatted as Transaction[];
       }
       return localTx;
     } catch (err) {
-      console.warn("DB Fetch Transactions failed, using local backup:", err);
+      console.warn("Using local transactions backup:", err);
       return localTx;
     }
   },
 
   addTransaction: async (tx: Transaction) => {
-    // Local first
-    const local = LocalBackup.get('local_txs');
+    const local = LocalBackup.get('ama_txs');
     local.unshift(tx);
-    LocalBackup.set('local_txs', local);
+    LocalBackup.set('ama_txs', local);
 
     if (!isSupabaseConfigured || !supabase) return;
 
@@ -132,28 +141,28 @@ export const DB = {
       }]);
       if (error) throw error;
     } catch (err) {
-      console.error("Cloud Add Transaction Error:", err);
+      console.error("Cloud Transaction Add Failed:", err);
     }
   },
 
   updateTransactionStatus: async (id: string, status: string) => {
-    const local = LocalBackup.get('local_txs');
+    const local = LocalBackup.get('ama_txs');
     const index = local.findIndex((t: any) => t.id === id);
     if (index > -1) local[index].status = status;
-    LocalBackup.set('local_txs', local);
+    LocalBackup.set('ama_txs', local);
 
     if (!isSupabaseConfigured || !supabase) return;
     try {
       const { error } = await supabase.from('transactions').update({ status }).eq('id', id);
       if (error) throw error;
     } catch (err) {
-      console.error("Cloud Update Status Error:", err);
+      console.error("Cloud Status Update Error:", err);
     }
   },
 
   // --- GATEWAYS ---
   fetchGateways: async (): Promise<PaymentGateway[]> => {
-    const localGw = LocalBackup.get('local_gateways');
+    const localGw = LocalBackup.get('ama_gateways');
     if (!isSupabaseConfigured || !supabase) return localGw;
 
     try {
@@ -173,7 +182,7 @@ export const DB = {
           feePercent: g.fee_percent,
           logoUrl: g.logo_url
         }));
-        LocalBackup.set('local_gateways', formatted);
+        LocalBackup.set('ama_gateways', formatted);
         return formatted as PaymentGateway[];
       }
       return localGw;
@@ -183,7 +192,7 @@ export const DB = {
   },
 
   saveGateway: async (gw: PaymentGateway) => {
-    LocalBackup.saveItem('local_gateways', gw, 'name');
+    LocalBackup.saveItem('ama_gateways', gw, 'name');
     if (!isSupabaseConfigured || !supabase) return;
     try {
       await supabase.from('payment_gateways').upsert({
@@ -198,9 +207,9 @@ export const DB = {
         max_deposit: gw.maxDeposit,
         fee_percent: gw.feePercent,
         logo_url: gw.logoUrl
-      });
+      }, { onConflict: 'name' });
     } catch (err) {
-      console.error("Cloud Save Gateway Error:", err);
+      console.error("Cloud Gateway Save Error:", err);
     }
   }
 };
