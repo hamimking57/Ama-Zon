@@ -6,16 +6,28 @@ import { supabase, isSupabaseConfigured } from './supabase';
 const LocalBackup = {
   get: (key: string) => {
     try {
-      return JSON.parse(localStorage.getItem(key) || '[]');
+      const data = localStorage.getItem(key);
+      return data ? JSON.parse(data) : [];
     } catch (e) {
+      console.error("LocalBackup Get Error:", e);
       return [];
     }
   },
-  set: (key: string, data: any) => localStorage.setItem(key, JSON.stringify(data)),
+  set: (key: string, data: any) => {
+    try {
+      localStorage.setItem(key, JSON.stringify(data));
+    } catch (e) {
+      console.error("LocalBackup Set Error:", e);
+    }
+  },
   saveItem: (key: string, item: any, idKey: string = 'id') => {
     const data = LocalBackup.get(key);
     const index = data.findIndex((i: any) => i[idKey] === item[idKey]);
-    if (index > -1) data[index] = item; else data.push(item);
+    if (index > -1) {
+      data[index] = { ...data[index], ...item };
+    } else {
+      data.push(item);
+    }
     LocalBackup.set(key, data);
   }
 };
@@ -24,31 +36,37 @@ export const DB = {
   // --- USERS ---
   fetchUsers: async (): Promise<User[]> => {
     const localData = LocalBackup.get('ama_users');
-    if (!isSupabaseConfigured || !supabase) return localData;
+    if (!isSupabaseConfigured || !supabase) {
+      console.warn("Supabase not configured, using local storage only.");
+      return localData;
+    }
 
     try {
       const { data, error } = await supabase.from('users').select('*');
       if (error) throw error;
       if (data && data.length > 0) {
+        // Sync cloud data back to local for future offline use
         LocalBackup.set('ama_users', data);
         return data as User[];
       }
       return localData;
     } catch (err) {
-      console.warn("Using local users backup:", err);
+      console.error("Cloud Fetch Users failed, falling back to local:", err);
       return localData;
     }
   },
 
   syncUser: async (user: User) => {
+    // 1. Save to LocalStorage immediately (User's browser)
     LocalBackup.saveItem('ama_users', user);
     
-    // Also update session user if it's the current user
+    // 2. Also update session storage if this is the active user
     const currentId = localStorage.getItem('ama_session_user_id');
     if (currentId === user.id) {
       localStorage.setItem('ama_session_user', JSON.stringify(user));
     }
 
+    // 3. Try to sync to Supabase (Cloud)
     if (!isSupabaseConfigured || !supabase) return;
 
     try {
@@ -62,9 +80,14 @@ export const DB = {
         balance: user.balance,
         portfolio: user.portfolio
       }, { onConflict: 'id' });
-      if (error) throw error;
+      
+      if (error) {
+        console.error("Supabase Upsert Error:", error.message);
+        throw error;
+      }
+      console.log("Successfully synced user to cloud:", user.email);
     } catch (err) {
-      console.error("User Cloud Sync Failed:", err);
+      console.error("User Cloud Sync CRITICAL failure:", err);
     }
   },
 
@@ -106,7 +129,7 @@ export const DB = {
           status: t.status,
           date: t.created_at || t.date,
           externalTxId: t.external_tx_id,
-          payoutDetails: t.payout_details
+          payout_details: t.payout_details
         }));
         LocalBackup.set('ama_txs', formatted);
         return formatted as Transaction[];

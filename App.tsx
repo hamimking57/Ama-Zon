@@ -42,19 +42,37 @@ const App: React.FC = () => {
   useEffect(() => {
     const init = async () => {
       setIsLoading(true);
-      const savedUser = localStorage.getItem('ama_session_user');
       
-      if (savedUser) {
-        const parsed = JSON.parse(savedUser);
-        setUser(parsed);
-        setCurrentPage(parsed.role === 'ADMIN' ? 'admin' : 'dashboard');
+      // 1. Recover from Local Storage immediately for zero-flicker UI
+      const savedUserStr = localStorage.getItem('ama_session_user');
+      const savedPage = localStorage.getItem('ama_current_page');
+      
+      if (savedUserStr) {
+        try {
+          const parsed = JSON.parse(savedUserStr);
+          setUser(parsed);
+          // Only restore dashboard/admin pages to avoid landing on login/signup after refresh
+          if (savedPage && (savedPage === 'dashboard' || savedPage === 'admin')) {
+            setCurrentPage(savedPage);
+          } else {
+            setCurrentPage(parsed.role === 'ADMIN' ? 'admin' : 'dashboard');
+          }
+        } catch (e) {
+          console.error("Session parse error", e);
+        }
       }
 
+      // 2. Fetch fresh data from DB
       await fetchData(true);
       setIsLoading(false);
     };
     init();
   }, []);
+
+  // Save current page to local storage whenever it changes
+  useEffect(() => {
+    localStorage.setItem('ama_current_page', currentPage);
+  }, [currentPage]);
 
   // Global Data Fetcher
   const fetchData = async (silent = false) => {
@@ -66,24 +84,24 @@ const App: React.FC = () => {
         DB.fetchGateways()
       ]);
       
-      setUsers(u);
-      setTransactions(t);
-      if (g.length > 0) setGateways(g);
+      if (u) setUsers(u);
+      if (t) setTransactions(t);
+      if (g && g.length > 0) setGateways(g);
       
       // Sync current logged in user with latest database state
       const currentSessionId = localStorage.getItem('ama_session_user_id');
       if (currentSessionId) {
+        // Find the user in the fresh users list to update balance/portfolio
         const freshUser = u.find(x => x.id === currentSessionId);
-        // Master Admin case
         if (currentSessionId === 'admin-1') {
-          // Keep admin session as is
+          // Master Admin session remains
         } else if (freshUser) {
           setUser(freshUser);
           localStorage.setItem('ama_session_user', JSON.stringify(freshUser));
         }
       }
     } catch (err) {
-      console.error("Critical Sync Error:", err);
+      console.error("Data Sync Error:", err);
     } finally {
       setIsRefreshing(false);
     }
@@ -134,6 +152,7 @@ const App: React.FC = () => {
     setUser(null);
     localStorage.removeItem('ama_session_user');
     localStorage.removeItem('ama_session_user_id');
+    localStorage.removeItem('ama_current_page');
     setCurrentPage('home');
   };
 
@@ -145,18 +164,31 @@ const App: React.FC = () => {
     const newUser: User = { 
       id: generateId(), name, email: sEmail.toLowerCase(), 
       address, phone, role: 'USER', balance: 0, 
-      portfolio: { [AssetType.BITCOIN]: 0, [AssetType.GOLD]: 0, [AssetType.DIAMOND]: 0, [AssetType.SILVER]: 0, [AssetType.PLATINUM]: 0 } as any 
+      portfolio: { 
+        [AssetType.BITCOIN]: 0, [AssetType.GOLD]: 0, [AssetType.DIAMOND]: 0, 
+        [AssetType.SILVER]: 0, [AssetType.PLATINUM]: 0, [AssetType.ANTIMATTER]: 0,
+        [AssetType.AI_COMPUTE]: 0, [AssetType.FUSION_ENERGY]: 0, [AssetType.NEURAL_LINK]: 0
+      } as any 
     };
 
     try {
+      // 1. Sync to cloud first to ensure admin can see it
       await DB.syncUser(newUser);
+      
+      // 2. Update local state for immediate feedback
       setUsers(prev => [...prev, newUser]);
       setUser(newUser);
+      
+      // 3. Persist session
       localStorage.setItem('ama_session_user', JSON.stringify(newUser));
       localStorage.setItem('ama_session_user_id', newUser.id);
       setCurrentPage('dashboard');
+      
+      // 4. Force refresh to confirm sync
+      await fetchData(true);
     } catch (err) {
-      alert("Registration failed. Check DB connection.");
+      console.error("Signup failed:", err);
+      alert("Registration failed. Please check your connection.");
     }
   };
 
@@ -171,7 +203,7 @@ const App: React.FC = () => {
     
     await DB.addTransaction(tx);
     alert("Deposit submitted. Admin will verify Reference: " + ref);
-    await fetchData(true); // Force re-sync so admin sees it instantly
+    await fetchData(true); 
   };
 
   const handleWithdraw = async (amt: number, details: string) => {
@@ -215,7 +247,6 @@ const App: React.FC = () => {
     }
   };
 
-  // handleAdminUpdateUser: Updates user data in database and refreshes local state
   const handleAdminUpdateUser = async (updatedUser: User) => {
     try {
       await DB.syncUser(updatedUser);
@@ -225,7 +256,6 @@ const App: React.FC = () => {
     }
   };
 
-  // handleAdminDeleteUser: Removes user from database and logs them out if it was the current session
   const handleAdminDeleteUser = async (userId: string) => {
     try {
       await DB.deleteUser(userId);
@@ -240,7 +270,7 @@ const App: React.FC = () => {
 
   if (isLoading) return <div className="min-h-screen bg-black flex flex-col items-center justify-center font-mono text-gold-500 animate-pulse">
     <BrandLogo className="w-20 h-20 mb-8" />
-    <span className="uppercase tracking-[0.5em]">Syncing Secure Data...</span>
+    <span className="uppercase tracking-[0.5em]">Establishing Secure Portal...</span>
   </div>;
 
   return (
