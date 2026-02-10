@@ -12,28 +12,49 @@ interface NavbarProps {
   onOpenWithdraw: () => void;
 }
 
+export const BrandLogo = ({ className = "w-8 h-8" }: { className?: string }) => (
+  <svg viewBox="0 0 100 100" className={className} fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M20 80L50 20L80 80" stroke="url(#logo-grad)" strokeWidth="12" strokeLinecap="round" strokeLinejoin="round"/>
+    <path d="M30 85C40 92 60 92 70 85" stroke="#EAB308" strokeWidth="6" strokeLinecap="round" className="animate-pulse"/>
+    <defs>
+      <linearGradient id="logo-grad" x1="20" y1="20" x2="80" y2="80" gradientUnits="userSpaceOnUse">
+        <stop stopColor="#FACC15"/>
+        <stop offset="1" stopColor="#B45309"/>
+      </linearGradient>
+    </defs>
+  </svg>
+);
+
 export const Navbar: React.FC<NavbarProps> = ({ user, onLogout, onNavigate, currentPage, onOpenDeposit, onOpenWithdraw }) => {
   return (
     <nav className="sticky top-0 z-50 bg-slate-950/80 backdrop-blur-md border-b border-white/10">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16 items-center">
-          <div className="flex items-center cursor-pointer" onClick={() => onNavigate('home')}>
-            <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-gold-400 to-amber-700 flex items-center justify-center mr-2">
-              <span className="text-white font-serif font-bold text-lg">A</span>
+          <div className="flex items-center cursor-pointer group" onClick={() => onNavigate('home')}>
+            <div className="mr-3 transform group-hover:scale-110 transition-transform duration-300">
+              <BrandLogo className="w-9 h-9 drop-shadow-[0_0_8px_rgba(234,179,8,0.4)]" />
             </div>
-            <span className="font-serif text-xl font-bold tracking-wide text-white">
+            <span className="font-serif text-2xl font-bold tracking-tight text-white">
               Ama<span className="text-gold-500">.zon</span>
             </span>
           </div>
 
           <div className="flex items-center space-x-6">
             {!user ? (
-              <button 
-                onClick={() => onNavigate('login')}
-                className="text-sm font-medium text-slate-300 hover:text-white transition"
-              >
-                Sign In
-              </button>
+              <div className="flex items-center space-x-4">
+                <button 
+                  onClick={() => onNavigate('login')}
+                  className="text-sm font-bold text-slate-300 hover:text-white transition uppercase tracking-widest"
+                >
+                  Login
+                </button>
+                <button 
+                  onClick={() => onNavigate('signup')}
+                  className="px-4 py-2 bg-gold-500/10 border border-gold-500/50 rounded-lg text-gold-500 text-xs font-black uppercase tracking-widest hover:bg-gold-500 hover:text-black transition-all"
+                >
+                  Join
+                </button>
+              </div>
             ) : (
               <>
                 <div className="hidden lg:flex items-center space-x-6 mr-4">

@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Asset, User, Transaction, TransactionType, TransactionStatus, PaymentGateway, AssetType } from './types';
 import { INITIAL_ASSETS, fluctuatePrices, generateId } from './services/mockData';
-import { Navbar } from './components/Navbar';
+import { Navbar, BrandLogo } from './components/Navbar';
 import { AssetCard } from './components/AssetCard';
 import { AdminPanel } from './components/AdminPanel';
 import { NewsTicker } from './components/NewsTicker';
@@ -222,6 +222,11 @@ const App: React.FC = () => {
                 <Sparkles className="text-gold-500" size={14}/>
                 <span className="text-gold-500 text-[10px] font-black uppercase tracking-widest">Premium Asset Management</span>
               </div>
+              
+              <div className="flex justify-center mb-10">
+                <BrandLogo className="w-24 h-24 md:w-32 md:h-32 drop-shadow-[0_0_30px_rgba(234,179,8,0.3)]" />
+              </div>
+
               <h1 className="text-6xl md:text-9xl font-serif font-bold text-white mb-8 tracking-tighter leading-none">
                 Elite <span className="text-gold-500 italic">Exchange.</span>
               </h1>
@@ -251,7 +256,7 @@ const App: React.FC = () => {
             <div className="w-full max-w-md bg-slate-900 border border-white/10 p-12 rounded-[3rem] shadow-2xl">
               <div className="flex justify-center mb-6">
                 <div className="p-4 bg-gold-500/10 rounded-3xl border border-gold-500/20">
-                  <LogIn className="text-gold-500" size={32} />
+                  <BrandLogo className="w-12 h-12" />
                 </div>
               </div>
               <h2 className="text-4xl font-serif font-bold text-white mb-4 text-center">Welcome Back</h2>
@@ -279,7 +284,7 @@ const App: React.FC = () => {
             <div className="w-full max-w-2xl bg-slate-900 border border-white/10 p-12 rounded-[3rem] shadow-2xl">
               <div className="flex justify-center mb-6">
                 <div className="p-4 bg-gold-500/10 rounded-3xl border border-gold-500/20">
-                  <UserPlus className="text-gold-500" size={32} />
+                  <BrandLogo className="w-12 h-12" />
                 </div>
               </div>
               <h2 className="text-4xl font-serif font-bold text-white mb-4 text-center">Membership Application</h2>
