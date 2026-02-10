@@ -30,11 +30,21 @@ export const BrandLogo = ({ className = "w-8 h-8" }: { className?: string }) => 
 );
 
 export const Navbar: React.FC<NavbarProps> = ({ user, onLogout, onNavigate, currentPage, onOpenDeposit, onOpenWithdraw }) => {
+  // Determine where to go when clicking the brand name
+  const handleBrandClick = () => {
+    if (user) {
+      // If admin, go to admin panel, otherwise to user dashboard
+      onNavigate(user.role === 'ADMIN' ? 'admin' : 'dashboard');
+    } else {
+      onNavigate('home');
+    }
+  };
+
   return (
     <nav className="sticky top-0 z-50 bg-slate-950/80 backdrop-blur-md border-b border-white/10">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16 items-center">
-          <div className="flex items-center cursor-pointer group" onClick={() => onNavigate('home')}>
+          <div className="flex items-center cursor-pointer group" onClick={handleBrandClick}>
             <div className="mr-3 transform group-hover:scale-110 transition-transform duration-300">
               <BrandLogo className="w-10 h-10 drop-shadow-[0_0_12px_rgba(234,179,8,0.5)]" />
             </div>
