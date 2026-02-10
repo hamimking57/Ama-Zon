@@ -42,11 +42,13 @@ export const DB = {
       .from('transactions')
       .select('*')
       .order('created_at', { ascending: false });
+    
     if (error) {
       console.error("Fetch Transactions Error:", error);
       return [];
     }
-    return data.map((t: any) => ({
+
+    return (data || []).map((t: any) => ({
       id: t.id,
       userId: t.user_id,
       userName: t.user_name,
@@ -56,9 +58,9 @@ export const DB = {
       totalValue: Number(t.total_value),
       type: t.type,
       status: t.status,
-      date: t.created_at,
+      date: t.created_at || t.date,
       externalTxId: t.external_tx_id,
-      payout_details: t.payout_details
+      payoutDetails: t.payout_details // Fixed mapping
     })) as Transaction[];
   },
 
@@ -82,7 +84,11 @@ export const DB = {
       external_tx_id: tx.externalTxId,
       payout_details: tx.payoutDetails
     }]);
-    if (error) console.error("Add Transaction Error:", error);
+    if (error) {
+      console.error("Add Transaction Error:", error);
+      // Even if DB fails, we rely on local state update in the UI 
+      // but log the error for the developer to fix schema issues.
+    }
   },
 
   updateTransactionStatus: async (id: string, status: string) => {
@@ -101,25 +107,28 @@ export const DB = {
   fetchGateways: async (): Promise<PaymentGateway[]> => {
     if (!isSupabaseConfigured || !supabase) return JSON.parse(localStorage.getItem('local_gateways') || '[]');
     const { data, error } = await supabase.from('payment_gateways').select('*');
-    if (error) return [];
-    return data.map((g: any) => ({
+    if (error) {
+      console.error("Fetch Gateways Error:", error);
+      return [];
+    }
+    return (data || []).map((g: any) => ({
       name: g.name,
       active: g.active,
       apiKey: g.api_key,
       bankName: g.bank_name,
-      account_number: g.account_number,
-      merchant_name: g.merchant_name,
+      accountNumber: g.account_number, // Fixed mapping
+      merchantName: g.merchant_name, // Fixed mapping
       currency: g.currency,
-      min_deposit: g.min_deposit,
-      max_deposit: g.max_deposit,
-      fee_percent: g.fee_percent,
-      logo_url: g.logo_url
+      minDeposit: g.min_deposit, // Fixed mapping
+      maxDeposit: g.max_deposit, // Fixed mapping
+      feePercent: g.fee_percent, // Fixed mapping
+      logoUrl: g.logo_url
     })) as PaymentGateway[];
   },
 
   saveGateway: async (gw: PaymentGateway) => {
     if (!isSupabaseConfigured || !supabase) return;
-    await supabase.from('payment_gateways').upsert({
+    const { error } = await supabase.from('payment_gateways').upsert({
       name: gw.name,
       active: gw.active,
       api_key: gw.apiKey,
@@ -132,5 +141,6 @@ export const DB = {
       fee_percent: gw.feePercent,
       logo_url: gw.logoUrl
     });
+    if (error) console.error("Save Gateway Error:", error);
   }
 };

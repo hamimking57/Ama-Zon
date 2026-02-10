@@ -68,7 +68,12 @@ export const formatCurrency = (value: number) => {
   }).format(value);
 };
 
-export const generateId = () => Math.random().toString(36).substr(2, 9);
+export const generateId = () => {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return Math.random().toString(36).substr(2, 9) + Date.now().toString(36);
+};
 
 export const fluctuatePrices = (assets: Asset[]): Asset[] => {
   return assets.map(asset => {
