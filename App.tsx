@@ -120,7 +120,6 @@ const App: React.FC = () => {
       return;
     }
 
-    // New user starts with 0 balance as per request
     const newUser: User = { 
       id: generateId(), 
       name, 
@@ -128,7 +127,7 @@ const App: React.FC = () => {
       address,
       phone,
       role: 'USER', 
-      balance: 0, // No initial bonus, only after deposit
+      balance: 0, // Zero initial balance as requested
       portfolio: { 
         [AssetType.BITCOIN]: 0, 
         [AssetType.GOLD]: 0, 
@@ -200,10 +199,52 @@ const App: React.FC = () => {
     await DB.addTransaction(tx);
     setTransactions(prev => [tx, ...prev]);
     
+    // Deduct balance immediately on withdrawal request to hold funds
     const updatedUser = { ...user, balance: user.balance - amt };
     setUser(updatedUser);
     await DB.syncUser(updatedUser);
     alert("Withdrawal request submitted.");
+  };
+
+  const handleProcessTransaction = async (id: string, status: TransactionStatus) => {
+    await DB.updateTransactionStatus(id, status);
+    
+    // Update transactions list
+    setTransactions(prev => prev.map(t => t.id === id ? { ...t, status } : t));
+    
+    const tx = transactions.find(t => t.id === id);
+    if (!tx) return;
+
+    // Logic for updating user balance based on approval/rejection
+    const targetUser = users.find(u => u.id === tx.userId);
+    if (targetUser) {
+      let newBalance = targetUser.balance;
+
+      if (status === TransactionStatus.APPROVED && tx.type === TransactionType.DEPOSIT) {
+        // Add funds on approved deposit
+        newBalance += tx.amount;
+      } else if (status === TransactionStatus.REJECTED && tx.type === TransactionType.WITHDRAW) {
+        // Return funds on rejected withdrawal (since it was held)
+        newBalance += tx.amount;
+      } else if (status === TransactionStatus.REJECTED && tx.type === TransactionType.DEPOSIT) {
+        // Nothing to do, deposit was rejected so balance remains same
+      } else if (status === TransactionStatus.APPROVED && tx.type === TransactionType.WITHDRAW) {
+        // Nothing to do, balance was already held/deducted
+      } else {
+        return; // No balance change needed for buy/sell
+      }
+
+      const updated = { ...targetUser, balance: newBalance };
+      await DB.syncUser(updated);
+      
+      // Sync global users list
+      setUsers(prev => prev.map(u => u.id === updated.id ? updated : u));
+      
+      // Sync currently logged in user if they are the target
+      if (user && user.id === updated.id) {
+        setUser(updated);
+      }
+    }
   };
 
   if (isLoading) return <div className="min-h-screen bg-black flex items-center justify-center font-mono text-gold-500 animate-pulse uppercase tracking-[0.5em]">Establishing Secure Link...</div>;
@@ -364,7 +405,7 @@ const App: React.FC = () => {
                  <div>
                    <div className="flex items-center space-x-3 mb-6">
                       <Wallet className="text-gold-500" size={24} />
-                      <span className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Available Balance</span>
+                      <span className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Liquid Balance</span>
                    </div>
                    <div className="text-5xl font-mono text-white font-black tracking-tight mb-8">${user.balance.toLocaleString()}</div>
                  </div>
@@ -406,21 +447,7 @@ const App: React.FC = () => {
             transactions={transactions} 
             users={users} 
             assets={assets} 
-            onProcessTransaction={async (id, status) => {
-              await DB.updateTransactionStatus(id, status);
-              setTransactions(prev => prev.map(t => t.id === id ? { ...t, status } : t));
-              if (status === TransactionStatus.APPROVED) {
-                const tx = transactions.find(t => t.id === id);
-                if (tx && (tx.type === TransactionType.DEPOSIT || tx.type === TransactionType.WITHDRAW)) {
-                   const target = users.find(u => u.id === tx.userId);
-                   if (target) {
-                     const updated = { ...target, balance: tx.type === TransactionType.DEPOSIT ? target.balance + tx.amount : target.balance };
-                     await DB.syncUser(updated);
-                     setUsers(prev => prev.map(u => u.id === updated.id ? updated : u));
-                   }
-                }
-              }
-            }} 
+            onProcessTransaction={handleProcessTransaction} 
             gateways={gateways} 
             onUpdateGateway={async (n, a) => {
               const gw = gateways.find(g => g.name === n);

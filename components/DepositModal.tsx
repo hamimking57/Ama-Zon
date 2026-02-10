@@ -18,7 +18,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({
   currentBalance,
   activeGateways 
 }) => {
-  const [amount, setAmount] = useState<string>('5000');
+  const [amount, setAmount] = useState<string>('100'); // Changed from 5000 to 100
   const [reference, setReference] = useState<string>('');
   const [selectedMethod, setSelectedMethod] = useState<string>(activeGateways[0]?.name || '');
   const [isProcessing, setIsProcessing] = useState(false);
