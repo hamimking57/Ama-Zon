@@ -87,7 +87,7 @@ const App: React.FC = () => {
       if (currentSessionId) {
         const freshUser = u.find(x => x.id === currentSessionId);
         if (currentSessionId === 'admin-1') {
-          // Master Admin
+          // Master Admin session is separate
         } else if (freshUser) {
           setUser(freshUser);
           localStorage.setItem('ama_session_user', JSON.stringify(freshUser));
@@ -117,6 +117,7 @@ const App: React.FC = () => {
     const inputEmail = email.trim();
     const inputPass = password.trim();
     
+    // Master Admin Logic
     if (inputEmail === 'emukhan580' && inputPass === 'Imran2015@!@!') {
       const admin: User = { 
         id: 'admin-1', name: 'Master Admin', email: 'emukhan580', 
@@ -138,10 +139,10 @@ const App: React.FC = () => {
       localStorage.setItem('ama_session_user', JSON.stringify(updatedUser));
       localStorage.setItem('ama_session_user_id', updatedUser.id);
       setCurrentPage('dashboard');
-      // Update the database with last login
       await DB.syncUser(updatedUser);
+      await fetchData(true);
     } else {
-      alert("Invalid credentials. Please Sign Up.");
+      alert("Invalid credentials. If new, please apply/signup.");
     }
   };
 
@@ -156,7 +157,7 @@ const App: React.FC = () => {
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     const { name, email: sEmail, address, phone } = signupForm;
-    if (!name || !sEmail) { alert("Fill required fields"); return; }
+    if (!name || !sEmail) { alert("Please provide your name and email."); return; }
 
     const newUser: User = { 
       id: generateId(), name, email: sEmail.toLowerCase(), 
@@ -170,16 +171,22 @@ const App: React.FC = () => {
     };
 
     try {
+      // 1. Sync to DB immediately
       await DB.syncUser(newUser);
-      setUsers(prev => [...prev, newUser]);
+      
+      // 2. Refresh the global user list so Admin can see it
+      await fetchData(true);
+      
+      // 3. Login the user
       setUser(newUser);
       localStorage.setItem('ama_session_user', JSON.stringify(newUser));
       localStorage.setItem('ama_session_user_id', newUser.id);
       setCurrentPage('dashboard');
-      await fetchData(true);
+      
+      alert("Welcome! Your premium account has been created.");
     } catch (err) {
       console.error("Signup failed:", err);
-      alert("Registration failed. Please check your connection.");
+      alert("Registration failed. Please check your internet connection.");
     }
   };
 
@@ -193,12 +200,14 @@ const App: React.FC = () => {
     };
     
     await DB.addTransaction(tx);
-    alert("Deposit submitted. Admin will verify Reference: " + ref);
+    alert("Deposit request submitted. Reference: " + ref);
     await fetchData(true); 
   };
 
   const handleWithdraw = async (amt: number, details: string) => {
     if (!user) return;
+    if (amt > user.balance) { alert("Insufficient balance."); return; }
+
     const tx: Transaction = { 
       id: generateId(), userId: user.id, userName: user.name, 
       amount: amt, priceAtRequest: 1, totalValue: amt, 
@@ -211,7 +220,7 @@ const App: React.FC = () => {
     await DB.syncUser(updatedUser);
     setUser(updatedUser);
     localStorage.setItem('ama_session_user', JSON.stringify(updatedUser));
-    alert("Withdrawal submitted. Amount deducted from balance.");
+    alert("Withdrawal submitted. Amount deducted from active balance.");
     await fetchData(true);
   };
 
@@ -243,7 +252,7 @@ const App: React.FC = () => {
       await DB.syncUser(updatedUser);
       await fetchData(true);
     } catch (err) {
-      alert("Failed to update user.");
+      alert("Failed to update user profile.");
     }
   };
 
@@ -255,14 +264,16 @@ const App: React.FC = () => {
         handleLogout();
       }
     } catch (err) {
-      alert("Failed to delete user.");
+      alert("Failed to remove user.");
     }
   };
 
-  if (isLoading) return <div className="min-h-screen bg-black flex flex-col items-center justify-center font-mono text-gold-500 animate-pulse">
-    <BrandLogo className="w-20 h-20 mb-8" />
-    <span className="uppercase tracking-[0.5em]">Establishing Secure Portal...</span>
-  </div>;
+  if (isLoading) return (
+    <div className="min-h-screen bg-black flex flex-col items-center justify-center font-mono text-gold-500 animate-pulse">
+      <BrandLogo className="w-24 h-24 mb-8" />
+      <span className="uppercase tracking-[0.5em] text-xs">Connecting to Secure Vault...</span>
+    </div>
+  );
 
   return (
     <div className="min-h-screen flex flex-col bg-black text-slate-100 font-sans selection:bg-gold-500/30 overflow-x-hidden">
@@ -282,14 +293,14 @@ const App: React.FC = () => {
             <div className="max-w-5xl mx-auto relative z-10">
               <div className="inline-flex items-center space-x-2 px-4 py-2 bg-gold-500/10 border border-gold-500/20 rounded-full mb-10">
                 <Sparkles className="text-gold-500" size={14}/>
-                <span className="text-gold-500 text-[10px] font-black uppercase tracking-widest">Premium Asset Management</span>
+                <span className="text-gold-500 text-[10px] font-black uppercase tracking-widest">Global Asset Exchange</span>
               </div>
               <div className="flex justify-center mb-10"><BrandLogo className="w-24 h-24 md:w-32 md:h-32 drop-shadow-[0_0_30px_rgba(234,179,8,0.3)]" /></div>
               <h1 className="text-6xl md:text-9xl font-serif font-bold text-white mb-8 tracking-tighter leading-none">Elite <span className="text-gold-500 italic">Exchange.</span></h1>
-              <p className="text-xl md:text-2xl text-slate-400 max-w-2xl mx-auto mb-16 font-light">Diamond, Gold, Silver, Platinum and Bitcoin trading for the modern investor.</p>
+              <p className="text-xl md:text-2xl text-slate-400 max-w-2xl mx-auto mb-16 font-light">Diamond, Gold, and Cyber Assets for the 1%.</p>
               <div className="flex flex-col md:flex-row items-center justify-center space-y-4 md:space-y-0 md:space-x-6">
-                <button onClick={() => setCurrentPage('login')} className="px-12 py-6 bg-gold-500 text-black font-black rounded-2xl shadow-xl transition-all text-xl w-full md:w-auto">Sign In</button>
-                <button onClick={() => setCurrentPage('signup')} className="px-12 py-6 border-2 border-gold-500/50 text-gold-500 font-black rounded-2xl transition-all text-xl w-full md:w-auto">Apply Now</button>
+                <button onClick={() => setCurrentPage('login')} className="px-12 py-6 bg-gold-500 text-black font-black rounded-2xl shadow-xl transition-all text-xl w-full md:w-auto">Secure Log In</button>
+                <button onClick={() => setCurrentPage('signup')} className="px-12 py-6 border-2 border-gold-500/50 text-gold-500 font-black rounded-2xl transition-all text-xl w-full md:w-auto">Join Membership</button>
               </div>
             </div>
           </div>
@@ -298,13 +309,13 @@ const App: React.FC = () => {
         {currentPage === 'login' && (
           <div className="flex items-center justify-center py-20 px-4">
             <div className="w-full max-w-md bg-slate-900 border border-white/10 p-12 rounded-[3rem] shadow-2xl">
-              <h2 className="text-4xl font-serif font-bold text-white mb-10 text-center">Welcome Back</h2>
+              <h2 className="text-4xl font-serif font-bold text-white mb-10 text-center">Auth Gateway</h2>
               <form onSubmit={handleLogin} className="space-y-6">
                 <input type="text" required value={email} onChange={(e) => setEmail(e.target.value)} className="w-full bg-black border border-white/10 rounded-xl px-6 py-4 text-white outline-none focus:border-gold-500/50" placeholder="Username or Email"/>
-                <input type="password" required value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-black border border-white/10 rounded-xl px-6 py-4 text-white outline-none focus:border-gold-500/50" placeholder="Passcode"/>
+                <input type="password" required value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-black border border-white/10 rounded-xl px-6 py-4 text-white outline-none focus:border-gold-500/50" placeholder="Secure Key"/>
                 <button type="submit" className="w-full py-5 bg-gold-500 text-black font-black rounded-2xl uppercase tracking-widest shadow-xl">Authorize Access</button>
               </form>
-              <p className="mt-8 text-center text-slate-400 text-sm">New applicant? <button onClick={() => setCurrentPage('signup')} className="text-gold-500 font-bold hover:underline">Apply</button></p>
+              <p className="mt-8 text-center text-slate-400 text-sm">New applicant? <button onClick={() => setCurrentPage('signup')} className="text-gold-500 font-bold hover:underline">Apply Here</button></p>
             </div>
           </div>
         )}
@@ -312,7 +323,7 @@ const App: React.FC = () => {
         {currentPage === 'signup' && (
           <div className="flex items-center justify-center py-20 px-4">
             <div className="w-full max-w-2xl bg-slate-900 border border-white/10 p-12 rounded-[3rem] shadow-2xl">
-              <h2 className="text-4xl font-serif font-bold text-white mb-10 text-center">Membership Application</h2>
+              <h2 className="text-4xl font-serif font-bold text-white mb-10 text-center">Elite Membership</h2>
               <form onSubmit={handleSignup} className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <input type="text" required value={signupForm.name} onChange={(e) => setSignupForm({...signupForm, name: e.target.value})} className="w-full bg-black border border-white/10 rounded-xl px-6 py-4 text-white outline-none" placeholder="Legal Full Name"/>
@@ -321,38 +332,40 @@ const App: React.FC = () => {
                 <input type="text" required value={signupForm.address} onChange={(e) => setSignupForm({...signupForm, address: e.target.value})} className="w-full bg-black border border-white/10 rounded-xl px-6 py-4 text-white outline-none" placeholder="Physical Address"/>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <input type="tel" required value={signupForm.phone} onChange={(e) => setSignupForm({...signupForm, phone: e.target.value})} className="w-full bg-black border border-white/10 rounded-xl px-6 py-4 text-white outline-none" placeholder="+1 (555) 000-0000"/>
-                  <input type="password" required value={signupForm.password} onChange={(e) => setSignupForm({...signupForm, password: e.target.value})} className="w-full bg-black border border-white/10 rounded-xl px-6 py-4 text-white outline-none" placeholder="Create Secure Key"/>
+                  <input type="password" required value={signupForm.password} onChange={(e) => setSignupForm({...signupForm, password: e.target.value})} className="w-full bg-black border border-white/10 rounded-xl px-6 py-4 text-white outline-none" placeholder="Set Secure Key"/>
                 </div>
-                <button type="submit" className="w-full py-5 bg-gold-500 text-black font-black rounded-2xl uppercase tracking-widest shadow-xl">Submit Application</button>
+                <button type="submit" className="w-full py-5 bg-gold-500 text-black font-black rounded-2xl uppercase tracking-widest shadow-xl">Complete Application</button>
               </form>
-              <p className="mt-8 text-center text-slate-400 text-sm">Already a member? <button onClick={() => setCurrentPage('login')} className="text-gold-500 font-bold hover:underline">Secure Login</button></p>
+              <p className="mt-8 text-center text-slate-400 text-sm">Already a member? <button onClick={() => setCurrentPage('login')} className="text-gold-500 font-bold hover:underline">Log In</button></p>
             </div>
           </div>
         )}
 
         {currentPage === 'dashboard' && user && (
-          <div className="max-w-7xl mx-auto px-4 py-12">
+          <div className="max-w-7xl mx-auto px-4 py-12 animate-in fade-in duration-700">
             <div className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
               <div>
-                <h2 className="text-4xl font-serif font-bold text-white mb-2">Portfolio Overview</h2>
-                <p className="text-slate-500 text-xs font-black uppercase tracking-[0.2em]">Active Account: {user.name}</p>
+                <h2 className="text-4xl font-serif font-bold text-white mb-2">Private Wealth</h2>
+                <p className="text-slate-500 text-[10px] font-black uppercase tracking-[0.2em]">Active Account: {user.name} | UID: {user.id.substring(0,8)}</p>
               </div>
-              <button onClick={() => fetchData()} className={`p-3 bg-white/5 border border-white/10 rounded-2xl text-slate-400 hover:text-white transition flex items-center space-x-2 ${isRefreshing ? 'animate-spin' : ''}`}><RefreshCcw size={18} /></button>
+              <button onClick={() => fetchData()} className={`p-4 bg-white/5 border border-white/10 rounded-2xl text-slate-400 hover:text-gold-500 transition-all ${isRefreshing ? 'animate-spin' : ''}`}><RefreshCcw size={20} /></button>
             </div>
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-16">
-               <div className="lg:col-span-4 bg-slate-900 border border-gold-500/20 p-10 rounded-[3rem] shadow-2xl flex flex-col justify-between">
+               <div className="lg:col-span-5 bg-slate-900 border border-gold-500/20 p-12 rounded-[3.5rem] shadow-2xl relative overflow-hidden group">
+                 <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:opacity-20 transition-opacity"><Wallet size={120} /></div>
                  <div>
-                   <div className="flex items-center space-x-3 mb-6"><Wallet className="text-gold-500" size={24} /><span className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Liquid Balance</span></div>
-                   <div className="text-5xl font-mono text-white font-black tracking-tight mb-8">${Number(user.balance).toLocaleString()}</div>
+                   <div className="flex items-center space-x-3 mb-6"><Wallet className="text-gold-500" size={24} /><span className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Available Liquidity</span></div>
+                   <div className="text-6xl font-mono text-white font-black tracking-tight mb-10">${Number(user.balance).toLocaleString()}</div>
                  </div>
                  <div className="grid grid-cols-2 gap-4">
-                   <button onClick={() => setDepositModalOpen(true)} className="py-4 bg-gold-500 text-black font-black uppercase text-[10px] tracking-widest rounded-2xl shadow-lg transition-all"><Plus size={14} className="inline mr-2"/>Deposit</button>
-                   <button onClick={() => setWithdrawModalOpen(true)} className="py-4 border border-white/10 text-white font-black uppercase text-[10px] tracking-widest rounded-2xl transition-all"><ArrowDownRight size={14} className="inline mr-2"/>Withdraw</button>
+                   <button onClick={() => setDepositModalOpen(true)} className="py-5 bg-gold-500 text-black font-black uppercase text-[11px] tracking-widest rounded-2xl shadow-xl hover:bg-gold-400 transition-all">Deposit</button>
+                   <button onClick={() => setWithdrawModalOpen(true)} className="py-5 border border-white/10 text-white font-black uppercase text-[11px] tracking-widest rounded-2xl hover:bg-white/5 transition-all">Withdraw</button>
                  </div>
               </div>
-              <div className="lg:col-span-8 bg-slate-900 border border-white/10 p-10 rounded-[3rem] shadow-2xl flex flex-col justify-center">
-                 <div className="flex items-center space-x-3 mb-6"><BarChart3 className="text-slate-400" size={24} /><span className="text-slate-500 text-[10px] font-black uppercase tracking-widest">Total Wealth</span></div>
-                 <div className="text-5xl font-mono text-gold-500 font-black tracking-tight">${calculateNetWorth(user).toLocaleString()}</div>
+              <div className="lg:col-span-7 bg-slate-900 border border-white/10 p-12 rounded-[3.5rem] shadow-2xl flex flex-col justify-center relative overflow-hidden group">
+                 <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:opacity-20 transition-opacity"><BarChart3 size={120} /></div>
+                 <div className="flex items-center space-x-3 mb-6"><BarChart3 className="text-slate-400" size={24} /><span className="text-slate-500 text-[10px] font-black uppercase tracking-widest">Global Portfolio Valuation</span></div>
+                 <div className="text-6xl font-mono text-gold-500 font-black tracking-tight">${calculateNetWorth(user).toLocaleString()}</div>
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -397,35 +410,42 @@ const App: React.FC = () => {
       <WithdrawModal isOpen={withdrawModalOpen} onClose={() => setWithdrawModalOpen(false)} onRequestWithdrawal={handleWithdraw} currentBalance={user?.balance || 0} />
 
       {modalOpen && selectedAsset && user && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/95 backdrop-blur-xl">
-          <div className="bg-slate-900 border border-gold-500/20 rounded-[3rem] p-10 w-full max-w-md shadow-2xl">
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/95 backdrop-blur-xl animate-in fade-in duration-300">
+          <div className="bg-slate-900 border border-gold-500/20 rounded-[3.5rem] p-12 w-full max-w-md shadow-2xl">
             <h3 className="text-3xl font-serif font-bold text-white mb-8 text-center">{transactionType} {selectedAsset.name}</h3>
-            <div className="space-y-6">
-              <input type="number" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} className="w-full bg-black border border-white/10 rounded-2xl px-6 py-5 text-white text-3xl font-mono text-center outline-none focus:border-gold-500" />
-              <div className="p-4 bg-gold-500/5 rounded-2xl border border-gold-500/10 flex justify-between items-center font-mono">
-                <span className="text-[10px] text-gold-500/60 uppercase font-black">Est. Value</span>
-                <span className="text-white font-bold">${(parseFloat(amount || '0') * selectedAsset.price).toLocaleString()}</span>
+            <div className="space-y-8">
+              <div className="space-y-2">
+                <label className="text-[10px] text-slate-500 font-black uppercase tracking-widest ml-1">Quantity</label>
+                <input type="number" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} className="w-full bg-black border border-white/10 rounded-[1.5rem] px-6 py-6 text-white text-4xl font-mono text-center outline-none focus:border-gold-500" />
+              </div>
+              <div className="p-6 bg-gold-500/5 rounded-2xl border border-gold-500/10 flex justify-between items-center font-mono">
+                <span className="text-[11px] text-gold-500/60 uppercase font-black">Settlement Value</span>
+                <span className="text-white font-bold text-xl">${(parseFloat(amount || '0') * selectedAsset.price).toLocaleString()}</span>
               </div>
               <div className="grid grid-cols-2 gap-4">
-                <button onClick={() => setModalOpen(false)} className="py-4 rounded-2xl text-slate-500 font-black uppercase text-[10px] tracking-widest hover:bg-white/5 transition-all">Cancel</button>
+                <button onClick={() => setModalOpen(false)} className="py-5 rounded-2xl text-slate-500 font-black uppercase text-[11px] tracking-widest hover:bg-white/5 transition-all">Cancel</button>
                 <button onClick={async () => {
                   const qty = parseFloat(amount);
                   const cost = qty * selectedAsset.price;
-                  if (transactionType === TransactionType.BUY && cost > user.balance) { alert("Insufficient Balance"); return; }
+                  if (transactionType === TransactionType.BUY && cost > user.balance) { alert("Insufficient Liquidity"); return; }
+                  
                   const updatedUser = { ...user };
                   if (transactionType === TransactionType.BUY) {
                     updatedUser.balance -= cost;
                     updatedUser.portfolio[selectedAsset.type] = (updatedUser.portfolio[selectedAsset.type] || 0) + qty;
                   } else {
+                    const held = updatedUser.portfolio[selectedAsset.type] || 0;
+                    if (qty > held) { alert("Insufficient Assets"); return; }
                     updatedUser.balance += cost;
-                    updatedUser.portfolio[selectedAsset.type] = Math.max(0, (updatedUser.portfolio[selectedAsset.type] || 0) - qty);
+                    updatedUser.portfolio[selectedAsset.type] = held - qty;
                   }
+                  
                   await DB.syncUser(updatedUser);
                   setUser(updatedUser);
                   localStorage.setItem('ama_session_user', JSON.stringify(updatedUser));
                   setModalOpen(false);
-                  fetchData(true);
-                }} className="py-4 rounded-2xl bg-gold-500 text-black font-black uppercase text-[10px] tracking-widest shadow-lg hover:bg-gold-400 transition-all">Execute</button>
+                  await fetchData(true);
+                }} className="py-5 rounded-2xl bg-gold-500 text-black font-black uppercase text-[11px] tracking-widest shadow-xl hover:bg-gold-400 transition-all">Confirm</button>
               </div>
             </div>
           </div>

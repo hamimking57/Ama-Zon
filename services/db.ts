@@ -37,30 +37,32 @@ export const DB = {
   fetchUsers: async (): Promise<User[]> => {
     const localData = LocalBackup.get('ama_users');
     if (!isSupabaseConfigured || !supabase) {
-      console.warn("Supabase not configured, using local storage only.");
+      console.warn("Supabase not connected. Using Local Mode.");
       return localData;
     }
 
     try {
       const { data, error } = await supabase.from('users').select('*');
       if (error) throw error;
-      if (data && data.length > 0) {
-        // Map snake_case database fields to camelCase if necessary (matching App.tsx expectations)
+      
+      if (data) {
+        // Map database snake_case to frontend camelCase
         const formatted = data.map((u: any) => ({
           ...u,
-          lastLogin: u.last_login || u.lastLogin
+          lastLogin: u.last_login || u.lastLogin || new Date().toISOString()
         }));
         LocalBackup.set('ama_users', formatted);
         return formatted as User[];
       }
       return localData;
     } catch (err) {
-      console.error("Cloud Fetch Users failed, falling back to local:", err);
+      console.error("Cloud Fetch Failed:", err);
       return localData;
     }
   },
 
   syncUser: async (user: User) => {
+    // 1. First, secure in browser memory
     LocalBackup.saveItem('ama_users', user);
     
     const currentId = localStorage.getItem('ama_session_user_id');
@@ -68,6 +70,7 @@ export const DB = {
       localStorage.setItem('ama_session_user', JSON.stringify(user));
     }
 
+    // 2. Push to Supabase
     if (!isSupabaseConfigured || !supabase) return;
 
     try {
@@ -80,15 +83,13 @@ export const DB = {
         role: user.role,
         balance: user.balance,
         portfolio: user.portfolio,
-        last_login: user.lastLogin // Ensuring snake_case for DB
+        last_login: user.lastLogin
       }, { onConflict: 'id' });
       
-      if (error) {
-        console.error("Supabase Upsert Error:", error.message);
-        throw error;
-      }
+      if (error) throw error;
+      console.log("Database Sync Success for:", user.email);
     } catch (err) {
-      console.error("User Cloud Sync CRITICAL failure:", err);
+      console.error("Database Sync Error:", err);
     }
   },
 
@@ -100,7 +101,7 @@ export const DB = {
     try {
       await supabase.from('users').delete().eq('id', userId);
     } catch (err) {
-      console.error("Cloud Delete User Error:", err);
+      console.error("Delete Error:", err);
     }
   },
 
@@ -137,7 +138,6 @@ export const DB = {
       }
       return localTx;
     } catch (err) {
-      console.warn("Using local transactions backup:", err);
       return localTx;
     }
   },
@@ -165,7 +165,7 @@ export const DB = {
       }]);
       if (error) throw error;
     } catch (err) {
-      console.error("Cloud Transaction Add Failed:", err);
+      console.error("Transaction Save Error:", err);
     }
   },
 
@@ -177,10 +177,9 @@ export const DB = {
 
     if (!isSupabaseConfigured || !supabase) return;
     try {
-      const { error } = await supabase.from('transactions').update({ status }).eq('id', id);
-      if (error) throw error;
+      await supabase.from('transactions').update({ status }).eq('id', id);
     } catch (err) {
-      console.error("Cloud Status Update Error:", err);
+      console.error("Status Update Failed:", err);
     }
   },
 
@@ -233,7 +232,7 @@ export const DB = {
         logo_url: gw.logoUrl
       }, { onConflict: 'name' });
     } catch (err) {
-      console.error("Cloud Gateway Save Error:", err);
+      console.error("Gateway Save Error:", err);
     }
   }
 };
