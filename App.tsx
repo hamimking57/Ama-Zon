@@ -52,12 +52,21 @@ const App: React.FC = () => {
         DB.fetchTransactions(),
         DB.fetchGateways()
       ]);
-      setUsers(u);
-      setTransactions(t);
-      if (g.length > 0) setGateways(g);
       
-      // Sync current user balance if they are logged in
-      if (user && user.role !== 'ADMIN') {
+      // Only update state if we actually got data back to avoid clearing the screen
+      if (u && u.length > 0) setUsers(u);
+      if (t) setTransactions(t);
+      if (g && g.length > 0) setGateways(g);
+      
+      // Session Persistence: Try to restore session if user exists in fresh users list
+      const savedUserId = localStorage.getItem('active_session_id');
+      if (savedUserId && !user) {
+        const sessionUser = u.find(x => x.id === savedUserId);
+        if (sessionUser) {
+          setUser(sessionUser);
+          setCurrentPage(sessionUser.role === 'ADMIN' ? 'admin' : 'dashboard');
+        }
+      } else if (user && user.role !== 'ADMIN') {
         const freshUser = u.find(x => x.id === user.id);
         if (freshUser) setUser(freshUser);
       }
@@ -73,7 +82,7 @@ const App: React.FC = () => {
     fetchData();
     const interval = setInterval(() => setAssets(prev => fluctuatePrices(prev)), 10000);
     return () => clearInterval(interval);
-  }, []);
+  }, [user?.id]); // Re-sync if user changes
 
   const calculateNetWorth = (targetUser: User) => {
     const portfolioValue = assets.reduce((acc, asset) => {
@@ -87,6 +96,7 @@ const App: React.FC = () => {
     const inputEmail = email.trim();
     const inputPass = password.trim();
     
+    // Master Admin Access
     if (inputEmail === 'emukhan580' && inputPass === 'Imran2015@!@!') {
       const admin: User = { 
         id: 'admin-1', 
@@ -97,23 +107,31 @@ const App: React.FC = () => {
         portfolio: {} as any 
       };
       setUser(admin);
+      localStorage.setItem('active_session_id', admin.id);
       setCurrentPage('admin');
-      fetchData(true); // Sync data on login
+      fetchData(true);
       return;
     }
 
     const existingUser = users.find(u => u.email.toLowerCase() === inputEmail.toLowerCase());
     if (existingUser) {
       setUser(existingUser);
+      localStorage.setItem('active_session_id', existingUser.id);
       setCurrentPage('dashboard');
     } else {
       alert("Invalid credentials. Please Sign Up or try again.");
     }
   };
 
+  const handleLogout = () => {
+    setUser(null);
+    localStorage.removeItem('active_session_id');
+    setCurrentPage('home');
+  };
+
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
-    const { name, email, address, phone, password: signupPassword } = signupForm;
+    const { name, email, address, phone } = signupForm;
     
     if (!name || !email || !address || !phone) {
       alert("Please fill all identity fields.");
@@ -151,9 +169,11 @@ const App: React.FC = () => {
       await DB.syncUser(newUser);
       setUsers(prev => [...prev, newUser]);
       setUser(newUser);
+      localStorage.setItem('active_session_id', newUser.id);
       setCurrentPage('dashboard');
     } catch (err) {
-      alert("Application failed. Database sync error.");
+      console.error("Signup failure:", err);
+      alert("Application failed. Data could not be saved.");
     }
   };
 
@@ -192,24 +212,10 @@ const App: React.FC = () => {
 
   const handleDeposit = async (amt: number, ref: string) => {
     if (!user) return;
-    const tx: Transaction = { 
-      id: generateId(), 
-      userId: user.id, 
-      userName: user.name, 
-      amount: amt, 
-      priceAtRequest: 1, 
-      totalValue: amt, 
-      type: TransactionType.DEPOSIT, 
-      status: TransactionStatus.PENDING, 
-      date: new Date().toISOString(), 
-      externalTxId: ref 
-    };
-    
+    const tx: Transaction = { id: generateId(), userId: user.id, userName: user.name, amount: amt, priceAtRequest: 1, totalValue: amt, type: TransactionType.DEPOSIT, status: TransactionStatus.PENDING, date: new Date().toISOString(), externalTxId: ref };
     await DB.addTransaction(tx);
     setTransactions(prev => [tx, ...prev]);
     alert("Deposit request submitted for audit. Our settlement team will verify the Reference ID within minutes.");
-    
-    // Refresh to ensure database state is up to date
     fetchData(true);
   };
 
@@ -229,8 +235,6 @@ const App: React.FC = () => {
   const handleProcessTransaction = async (id: string, status: TransactionStatus) => {
     try {
       await DB.updateTransactionStatus(id, status);
-      
-      // Find the transaction object to determine balance change
       const tx = transactions.find(t => t.id === id);
       if (!tx) return;
 
@@ -240,17 +244,15 @@ const App: React.FC = () => {
         if (status === TransactionStatus.APPROVED && tx.type === TransactionType.DEPOSIT) {
           newBalance += tx.amount;
         } else if (status === TransactionStatus.REJECTED && tx.type === TransactionType.WITHDRAW) {
-          newBalance += tx.amount; // Refund
+          newBalance += tx.amount;
         }
 
         const updated = { ...targetUser, balance: newBalance };
         await DB.syncUser(updated);
-        
-        // Final refresh to ensure everything is in sync
         fetchData(true);
       }
     } catch (err) {
-      alert("Error processing transaction. Please retry.");
+      alert("Error processing transaction.");
     }
   };
 
@@ -280,7 +282,7 @@ const App: React.FC = () => {
       <NewsTicker />
       <Navbar 
         user={user} 
-        onLogout={() => { setUser(null); setCurrentPage('home'); }} 
+        onLogout={handleLogout} 
         onNavigate={setCurrentPage} 
         currentPage={currentPage} 
         onOpenDeposit={() => setDepositModalOpen(true)} 
