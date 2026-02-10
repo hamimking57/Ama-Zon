@@ -8,7 +8,7 @@ export const DB = {
     if (!isSupabaseConfigured || !supabase) return JSON.parse(localStorage.getItem('local_users') || '[]');
     const { data, error } = await supabase.from('users').select('*');
     if (error) {
-      console.error("Fetch Users Error:", error);
+      console.error("Fetch Users Error:", error.message);
       return [];
     }
     return data as User[];
@@ -22,6 +22,8 @@ export const DB = {
       localStorage.setItem('local_users', JSON.stringify(local));
       return;
     }
+    
+    // Attempting to upsert into the 'users' table
     const { error } = await supabase.from('users').upsert({
       id: user.id,
       name: user.name,
@@ -32,7 +34,11 @@ export const DB = {
       balance: user.balance,
       portfolio: user.portfolio
     });
-    if (error) console.error("Sync User Error:", error);
+    
+    if (error) {
+      console.error("Sync User Error:", error.message, error.details);
+      throw new Error(`Failed to save user to database: ${error.message}`);
+    }
   },
 
   // --- TRANSACTIONS ---
@@ -44,7 +50,7 @@ export const DB = {
       .order('created_at', { ascending: false });
     
     if (error) {
-      console.error("Fetch Transactions Error:", error);
+      console.error("Fetch Transactions Error:", error.message);
       return [];
     }
 
@@ -60,7 +66,7 @@ export const DB = {
       status: t.status,
       date: t.created_at || t.date,
       externalTxId: t.external_tx_id,
-      payoutDetails: t.payout_details // Fixed mapping
+      payoutDetails: t.payout_details
     })) as Transaction[];
   },
 
@@ -85,9 +91,7 @@ export const DB = {
       payout_details: tx.payoutDetails
     }]);
     if (error) {
-      console.error("Add Transaction Error:", error);
-      // Even if DB fails, we rely on local state update in the UI 
-      // but log the error for the developer to fix schema issues.
+      console.error("Add Transaction Error:", error.message);
     }
   },
 
@@ -100,7 +104,7 @@ export const DB = {
       return;
     }
     const { error } = await supabase.from('transactions').update({ status }).eq('id', id);
-    if (error) console.error("Update Status Error:", error);
+    if (error) console.error("Update Status Error:", error.message);
   },
 
   // --- GATEWAYS ---
@@ -108,7 +112,7 @@ export const DB = {
     if (!isSupabaseConfigured || !supabase) return JSON.parse(localStorage.getItem('local_gateways') || '[]');
     const { data, error } = await supabase.from('payment_gateways').select('*');
     if (error) {
-      console.error("Fetch Gateways Error:", error);
+      console.error("Fetch Gateways Error:", error.message);
       return [];
     }
     return (data || []).map((g: any) => ({
@@ -116,12 +120,12 @@ export const DB = {
       active: g.active,
       apiKey: g.api_key,
       bankName: g.bank_name,
-      accountNumber: g.account_number, // Fixed mapping
-      merchantName: g.merchant_name, // Fixed mapping
+      accountNumber: g.account_number,
+      merchantName: g.merchant_name,
       currency: g.currency,
-      minDeposit: g.min_deposit, // Fixed mapping
-      maxDeposit: g.max_deposit, // Fixed mapping
-      feePercent: g.fee_percent, // Fixed mapping
+      minDeposit: g.min_deposit,
+      maxDeposit: g.max_deposit,
+      feePercent: g.fee_percent,
       logoUrl: g.logo_url
     })) as PaymentGateway[];
   },
@@ -141,6 +145,6 @@ export const DB = {
       fee_percent: gw.feePercent,
       logo_url: gw.logoUrl
     });
-    if (error) console.error("Save Gateway Error:", error);
+    if (error) console.error("Save Gateway Error:", error.message);
   }
 };

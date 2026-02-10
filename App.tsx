@@ -120,6 +120,7 @@ const App: React.FC = () => {
       return;
     }
 
+    // New user starts with 0 balance as per request
     const newUser: User = { 
       id: generateId(), 
       name, 
@@ -127,7 +128,7 @@ const App: React.FC = () => {
       address,
       phone,
       role: 'USER', 
-      balance: 5000, // Welcome bonus
+      balance: 0, // No initial bonus, only after deposit
       portfolio: { 
         [AssetType.BITCOIN]: 0, 
         [AssetType.GOLD]: 0, 
@@ -141,10 +142,15 @@ const App: React.FC = () => {
       } as any 
     };
 
-    await DB.syncUser(newUser);
-    setUsers(prev => [...prev, newUser]);
-    setUser(newUser);
-    setCurrentPage('dashboard');
+    try {
+      await DB.syncUser(newUser);
+      setUsers(prev => [...prev, newUser]);
+      setUser(newUser);
+      setCurrentPage('dashboard');
+    } catch (err) {
+      console.error("Signup error:", err);
+      alert("Account creation failed. Please check your database connection.");
+    }
   };
 
   const submitTransaction = async () => {
