@@ -11,7 +11,7 @@ import { DepositModal } from './components/DepositModal';
 import { WithdrawModal } from './components/WithdrawModal';
 import { DB } from './services/db';
 import { isSupabaseConfigured } from './services/supabase';
-import { Sparkles, BarChart3, Wallet, ArrowRight, AlertTriangle, Plus, ArrowUpRight, ArrowDownRight, UserPlus, LogIn, MapPin, Phone, Mail, Shield } from 'lucide-react';
+import { Sparkles, BarChart3, Wallet, ArrowRight, AlertTriangle, Plus, ArrowUpRight, ArrowDownRight, UserPlus, LogIn, MapPin, Phone, Mail, Shield, RefreshCcw } from 'lucide-react';
 
 const App: React.FC = () => {
   const [currentPage, setCurrentPage] = useState('home');
@@ -21,6 +21,7 @@ const App: React.FC = () => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [gateways, setGateways] = useState<PaymentGateway[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Auth States
   const [email, setEmail] = useState('');
@@ -42,31 +43,35 @@ const App: React.FC = () => {
   const [depositModalOpen, setDepositModalOpen] = useState(false);
   const [withdrawModalOpen, setWithdrawModalOpen] = useState(false);
 
-  useEffect(() => {
-    const init = async () => {
-      setIsLoading(true);
-      try {
-        const [u, t, g] = await Promise.all([
-          DB.fetchUsers(),
-          DB.fetchTransactions(),
-          DB.fetchGateways()
-        ]);
-        setUsers(u);
-        setTransactions(t);
-        setGateways(g.length > 0 ? g : [
-          { name: 'Manual Transfer', active: true, apiKey: 'man', bankName: 'Elite Global', accountNumber: 'Elite-01-99', currency: 'USD', logoUrl: 'https://img.icons8.com/color/96/bank.png', merchantName: 'Ama.zon Corp', minDeposit: 10, maxDeposit: 1000000, feePercent: 0 }
-        ]);
-      } catch (err) {
-        console.error("Database connection error:", err);
-      } finally {
-        setIsLoading(false);
+  // Global Data Fetcher
+  const fetchData = async (silent = false) => {
+    if (!silent) setIsRefreshing(true);
+    try {
+      const [u, t, g] = await Promise.all([
+        DB.fetchUsers(),
+        DB.fetchTransactions(),
+        DB.fetchGateways()
+      ]);
+      setUsers(u);
+      setTransactions(t);
+      if (g.length > 0) setGateways(g);
+      
+      // Sync current user balance if they are logged in
+      if (user && user.role !== 'ADMIN') {
+        const freshUser = u.find(x => x.id === user.id);
+        if (freshUser) setUser(freshUser);
       }
-    };
-    init();
-  }, []);
+    } catch (err) {
+      console.error("Data fetch error:", err);
+    } finally {
+      setIsRefreshing(false);
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const interval = setInterval(() => setAssets(prev => fluctuatePrices(prev)), 5000);
+    fetchData();
+    const interval = setInterval(() => setAssets(prev => fluctuatePrices(prev)), 10000);
     return () => clearInterval(interval);
   }, []);
 
@@ -93,6 +98,7 @@ const App: React.FC = () => {
       };
       setUser(admin);
       setCurrentPage('admin');
+      fetchData(true); // Sync data on login
       return;
     }
 
@@ -101,22 +107,22 @@ const App: React.FC = () => {
       setUser(existingUser);
       setCurrentPage('dashboard');
     } else {
-      alert("Invalid credentials. If you are new, please Sign Up.");
+      alert("Invalid credentials. Please Sign Up or try again.");
     }
   };
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
-    const { name, email, address, phone } = signupForm;
+    const { name, email, address, phone, password: signupPassword } = signupForm;
     
     if (!name || !email || !address || !phone) {
-      alert("Please fill all fields.");
+      alert("Please fill all identity fields.");
       return;
     }
 
     const normalizedEmail = email.toLowerCase();
     if (users.some(u => u.email.toLowerCase() === normalizedEmail)) {
-      alert("User with this email already exists.");
+      alert("This email is already registered.");
       return;
     }
 
@@ -147,8 +153,7 @@ const App: React.FC = () => {
       setUser(newUser);
       setCurrentPage('dashboard');
     } catch (err) {
-      console.error("Signup error:", err);
-      alert("Account creation failed. Please check your database connection.");
+      alert("Application failed. Database sync error.");
     }
   };
 
@@ -158,7 +163,7 @@ const App: React.FC = () => {
     const totalCost = qty * selectedAsset.price;
     
     if (transactionType === TransactionType.BUY && totalCost > user.balance) {
-      alert("Insufficient Funds.");
+      alert("Insufficient Liquid Balance.");
       return;
     }
 
@@ -187,10 +192,25 @@ const App: React.FC = () => {
 
   const handleDeposit = async (amt: number, ref: string) => {
     if (!user) return;
-    const tx: Transaction = { id: generateId(), userId: user.id, userName: user.name, amount: amt, priceAtRequest: 1, totalValue: amt, type: TransactionType.DEPOSIT, status: TransactionStatus.PENDING, date: new Date().toISOString(), externalTxId: ref };
+    const tx: Transaction = { 
+      id: generateId(), 
+      userId: user.id, 
+      userName: user.name, 
+      amount: amt, 
+      priceAtRequest: 1, 
+      totalValue: amt, 
+      type: TransactionType.DEPOSIT, 
+      status: TransactionStatus.PENDING, 
+      date: new Date().toISOString(), 
+      externalTxId: ref 
+    };
+    
     await DB.addTransaction(tx);
     setTransactions(prev => [tx, ...prev]);
-    alert("Deposit request submitted for audit.");
+    alert("Deposit request submitted for audit. Our settlement team will verify the Reference ID within minutes.");
+    
+    // Refresh to ensure database state is up to date
+    fetchData(true);
   };
 
   const handleWithdraw = async (amt: number, details: string) => {
@@ -199,56 +219,57 @@ const App: React.FC = () => {
     await DB.addTransaction(tx);
     setTransactions(prev => [tx, ...prev]);
     
-    // Deduct balance immediately on withdrawal request to hold funds
     const updatedUser = { ...user, balance: user.balance - amt };
     setUser(updatedUser);
     await DB.syncUser(updatedUser);
-    alert("Withdrawal request submitted.");
+    alert("Withdrawal request submitted. Funds are held in escrow until approval.");
+    fetchData(true);
   };
 
   const handleProcessTransaction = async (id: string, status: TransactionStatus) => {
-    await DB.updateTransactionStatus(id, status);
-    setTransactions(prev => prev.map(t => t.id === id ? { ...t, status } : t));
-    
-    const tx = transactions.find(t => t.id === id);
-    if (!tx) return;
+    try {
+      await DB.updateTransactionStatus(id, status);
+      
+      // Find the transaction object to determine balance change
+      const tx = transactions.find(t => t.id === id);
+      if (!tx) return;
 
-    const targetUser = users.find(u => u.id === tx.userId);
-    if (targetUser) {
-      let newBalance = Number(targetUser.balance);
-      if (status === TransactionStatus.APPROVED && tx.type === TransactionType.DEPOSIT) {
-        newBalance += tx.amount;
-      } else if (status === TransactionStatus.REJECTED && tx.type === TransactionType.WITHDRAW) {
-        newBalance += tx.amount;
+      const targetUser = users.find(u => u.id === tx.userId);
+      if (targetUser) {
+        let newBalance = Number(targetUser.balance);
+        if (status === TransactionStatus.APPROVED && tx.type === TransactionType.DEPOSIT) {
+          newBalance += tx.amount;
+        } else if (status === TransactionStatus.REJECTED && tx.type === TransactionType.WITHDRAW) {
+          newBalance += tx.amount; // Refund
+        }
+
+        const updated = { ...targetUser, balance: newBalance };
+        await DB.syncUser(updated);
+        
+        // Final refresh to ensure everything is in sync
+        fetchData(true);
       }
-
-      const updated = { ...targetUser, balance: newBalance };
-      await DB.syncUser(updated);
-      setUsers(prev => prev.map(u => u.id === updated.id ? updated : u));
-      if (user && user.id === updated.id) setUser(updated);
+    } catch (err) {
+      alert("Error processing transaction. Please retry.");
     }
   };
 
   const handleAdminUpdateUser = async (updated: User) => {
     try {
       await DB.syncUser(updated);
-      setUsers(prev => prev.map(u => u.id === updated.id ? updated : u));
-      if (user && user.id === updated.id) setUser(updated);
-      console.log("User updated by Admin");
+      fetchData(true);
     } catch (err) {
-      console.error("Failed to update user:", err);
-      alert("Database sync failed.");
+      alert("User update failed.");
     }
   };
 
   const handleAdminDeleteUser = async (userId: string) => {
     try {
       await DB.deleteUser(userId);
-      setUsers(prev => prev.filter(u => u.id !== userId));
-      alert("User account has been terminated.");
+      fetchData(true);
+      alert("Member account deleted successfully.");
     } catch (err) {
-      console.error("Failed to delete user:", err);
-      alert("Database error while deleting user.");
+      alert("Error deleting user.");
     }
   };
 
@@ -399,10 +420,13 @@ const App: React.FC = () => {
                 <h2 className="text-4xl font-serif font-bold text-white mb-2">Portfolio Overview</h2>
                 <p className="text-slate-500 text-xs font-black uppercase tracking-[0.2em]">Active Account: {user.name}</p>
               </div>
-              <div className="px-6 py-3 bg-white/5 border border-white/10 rounded-2xl flex items-center space-x-3">
-                 <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                 <span className="text-[10px] text-slate-300 font-black uppercase tracking-widest">Global Sync Active</span>
-              </div>
+              <button 
+                onClick={() => fetchData()}
+                className={`p-3 bg-white/5 border border-white/10 rounded-2xl text-slate-400 hover:text-white transition flex items-center space-x-2 ${isRefreshing ? 'animate-spin' : ''}`}
+                title="Refresh Assets"
+              >
+                <RefreshCcw size={18} />
+              </button>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-16">
@@ -455,6 +479,8 @@ const App: React.FC = () => {
             onProcessTransaction={handleProcessTransaction} 
             onUpdateUser={handleAdminUpdateUser}
             onDeleteUser={handleAdminDeleteUser}
+            onRefresh={() => fetchData()}
+            isRefreshing={isRefreshing}
             gateways={gateways} 
             onUpdateGateway={async (n, a) => {
               const gw = gateways.find(g => g.name === n);

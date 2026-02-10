@@ -7,7 +7,7 @@ import {
   Link as LinkIcon, Building2, Hash, Globe, Percent, ArrowDownToLine, 
   ArrowUpToLine, UserCircle, Image as ImageIcon, Wallet, ArrowDownRight, 
   Users, Mail, PieChart, Database, Terminal, FileJson, Trash, Server, 
-  Activity, Copy, Check, Filter, Calendar, Search, Edit3, Settings, AlertTriangle, X
+  Activity, Copy, Check, Filter, Calendar, Search, Edit3, Settings, AlertTriangle, X, RefreshCw
 } from 'lucide-react';
 
 interface AdminPanelProps {
@@ -21,6 +21,8 @@ interface AdminPanelProps {
   onRemoveGateway: (name: string) => void;
   onUpdateUser: (user: User) => void;
   onDeleteUser: (userId: string) => void;
+  onRefresh?: () => void;
+  isRefreshing?: boolean;
 }
 
 export const AdminPanel: React.FC<AdminPanelProps> = ({ 
@@ -33,7 +35,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   onAddGateway,
   onRemoveGateway,
   onUpdateUser,
-  onDeleteUser
+  onDeleteUser,
+  onRefresh,
+  isRefreshing
 }) => {
   const [tab, setTab] = useState('requests');
   const [typeFilter, setTypeFilter] = useState<string>('ALL');
@@ -105,22 +109,32 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-10">
-      <div className="flex space-x-12 mb-10 border-b border-white/5 relative overflow-x-auto pb-1 custom-scrollbar">
-        <button onClick={() => setTab('requests')} className={`pb-4 px-2 font-black uppercase tracking-[0.2em] text-[11px] whitespace-nowrap transition-all relative ${tab === 'requests' ? 'text-gold-500' : 'text-slate-500 hover:text-slate-300'}`}>
-          Pending Requests ({pendingRequests.length})
-          {tab === 'requests' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-gold-500 shadow-[0_0_10px_rgba(234,179,8,0.5)]"></div>}
-        </button>
-        <button onClick={() => setTab('history')} className={`pb-4 px-2 font-black uppercase tracking-[0.2em] text-[11px] whitespace-nowrap transition-all relative ${tab === 'history' ? 'text-gold-500' : 'text-slate-500 hover:text-slate-300'}`}>
-          Transaction History
-          {tab === 'history' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-gold-500 shadow-[0_0_10px_rgba(234,179,8,0.5)]"></div>}
-        </button>
-        <button onClick={() => setTab('users')} className={`pb-4 px-2 font-black uppercase tracking-[0.2em] text-[11px] whitespace-nowrap transition-all relative ${tab === 'users' ? 'text-gold-500' : 'text-slate-500 hover:text-slate-300'}`}>
-          User Maintenance ({users.length})
-          {tab === 'users' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-gold-500 shadow-[0_0_10px_rgba(234,179,8,0.5)]"></div>}
-        </button>
-        <button onClick={() => setTab('settings')} className={`pb-4 px-2 font-black uppercase tracking-[0.2em] text-[11px] whitespace-nowrap transition-all relative ${tab === 'settings' ? 'text-gold-500' : 'text-slate-500 hover:text-slate-300'}`}>
-          Merchant Settings
-          {tab === 'settings' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-gold-500 shadow-[0_0_10px_rgba(234,179,8,0.5)]"></div>}
+      <div className="flex justify-between items-center mb-10 border-b border-white/5">
+        <div className="flex space-x-12 relative overflow-x-auto pb-1 custom-scrollbar">
+          <button onClick={() => setTab('requests')} className={`pb-4 px-2 font-black uppercase tracking-[0.2em] text-[11px] whitespace-nowrap transition-all relative ${tab === 'requests' ? 'text-gold-500' : 'text-slate-500 hover:text-slate-300'}`}>
+            Pending Requests ({pendingRequests.length})
+            {tab === 'requests' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-gold-500 shadow-[0_0_10px_rgba(234,179,8,0.5)]"></div>}
+          </button>
+          <button onClick={() => setTab('history')} className={`pb-4 px-2 font-black uppercase tracking-[0.2em] text-[11px] whitespace-nowrap transition-all relative ${tab === 'history' ? 'text-gold-500' : 'text-slate-500 hover:text-slate-300'}`}>
+            Transaction History
+            {tab === 'history' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-gold-500 shadow-[0_0_10px_rgba(234,179,8,0.5)]"></div>}
+          </button>
+          <button onClick={() => setTab('users')} className={`pb-4 px-2 font-black uppercase tracking-[0.2em] text-[11px] whitespace-nowrap transition-all relative ${tab === 'users' ? 'text-gold-500' : 'text-slate-500 hover:text-slate-300'}`}>
+            User Maintenance ({users.length})
+            {tab === 'users' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-gold-500 shadow-[0_0_10px_rgba(234,179,8,0.5)]"></div>}
+          </button>
+          <button onClick={() => setTab('settings')} className={`pb-4 px-2 font-black uppercase tracking-[0.2em] text-[11px] whitespace-nowrap transition-all relative ${tab === 'settings' ? 'text-gold-500' : 'text-slate-500 hover:text-slate-300'}`}>
+            Merchant Settings
+            {tab === 'settings' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-gold-500 shadow-[0_0_10px_rgba(234,179,8,0.5)]"></div>}
+          </button>
+        </div>
+        
+        <button 
+          onClick={onRefresh}
+          className={`flex items-center space-x-2 px-6 py-2 bg-white/5 border border-white/10 rounded-xl text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-white transition-all mb-4 ${isRefreshing ? 'opacity-50 pointer-events-none' : ''}`}
+        >
+          <RefreshCw size={14} className={isRefreshing ? 'animate-spin' : ''} />
+          <span>{isRefreshing ? 'Syncing...' : 'Refresh Data'}</span>
         </button>
       </div>
 
@@ -157,7 +171,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 </tr>
               ))}
               {pendingRequests.length === 0 && (
-                <tr><td colSpan={4} className="p-32 text-center text-slate-500 font-black uppercase text-xs tracking-widest">No pending liquidity movements.</td></tr>
+                <tr><td colSpan={4} className="p-32 text-center text-slate-500 font-black uppercase text-xs tracking-widest">
+                  <div className="flex flex-col items-center justify-center space-y-4">
+                    <Database size={48} className="text-slate-800" />
+                    <span>No pending liquidity movements.</span>
+                    <button onClick={onRefresh} className="text-gold-500 hover:underline">Click to refresh</button>
+                  </div>
+                </td></tr>
               )}
             </tbody>
           </table>
