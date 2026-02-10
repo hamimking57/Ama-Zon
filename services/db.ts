@@ -45,9 +45,13 @@ export const DB = {
       const { data, error } = await supabase.from('users').select('*');
       if (error) throw error;
       if (data && data.length > 0) {
-        // Sync cloud data back to local for future offline use
-        LocalBackup.set('ama_users', data);
-        return data as User[];
+        // Map snake_case database fields to camelCase if necessary (matching App.tsx expectations)
+        const formatted = data.map((u: any) => ({
+          ...u,
+          lastLogin: u.last_login || u.lastLogin
+        }));
+        LocalBackup.set('ama_users', formatted);
+        return formatted as User[];
       }
       return localData;
     } catch (err) {
@@ -57,16 +61,13 @@ export const DB = {
   },
 
   syncUser: async (user: User) => {
-    // 1. Save to LocalStorage immediately (User's browser)
     LocalBackup.saveItem('ama_users', user);
     
-    // 2. Also update session storage if this is the active user
     const currentId = localStorage.getItem('ama_session_user_id');
     if (currentId === user.id) {
       localStorage.setItem('ama_session_user', JSON.stringify(user));
     }
 
-    // 3. Try to sync to Supabase (Cloud)
     if (!isSupabaseConfigured || !supabase) return;
 
     try {
@@ -78,14 +79,14 @@ export const DB = {
         phone: user.phone,
         role: user.role,
         balance: user.balance,
-        portfolio: user.portfolio
+        portfolio: user.portfolio,
+        last_login: user.lastLogin // Ensuring snake_case for DB
       }, { onConflict: 'id' });
       
       if (error) {
         console.error("Supabase Upsert Error:", error.message);
         throw error;
       }
-      console.log("Successfully synced user to cloud:", user.email);
     } catch (err) {
       console.error("User Cloud Sync CRITICAL failure:", err);
     }

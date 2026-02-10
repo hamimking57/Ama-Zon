@@ -7,7 +7,7 @@ import {
   Link as LinkIcon, Building2, Hash, Globe, Percent, ArrowDownToLine, 
   ArrowUpToLine, UserCircle, Image as ImageIcon, Wallet, ArrowDownRight, 
   Users, Mail, PieChart, Database, Terminal, FileJson, Trash, Server, 
-  Activity, Copy, Check, Filter, Calendar, Search, Edit3, Settings, AlertTriangle, X, RefreshCw
+  Activity, Copy, Check, Filter, Calendar, Search, Edit3, Settings, AlertTriangle, X, RefreshCw, Phone, MapPin
 } from 'lucide-react';
 
 interface AdminPanelProps {
@@ -296,13 +296,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               <div className="p-3 bg-gold-500/10 rounded-xl">
                 <Users className="text-gold-500" size={20} />
               </div>
-              <h4 className="text-white font-bold uppercase text-xs tracking-widest">Search Member Directory</h4>
+              <h4 className="text-white font-bold uppercase text-xs tracking-widest">Member Directory</h4>
             </div>
             <div className="relative w-full md:w-80">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600" size={16} />
               <input 
                 type="text" 
-                placeholder="Name or Email..." 
+                placeholder="Find member by name/email..." 
                 value={userSearch}
                 onChange={(e) => setUserSearch(e.target.value)}
                 className="w-full bg-black border border-white/10 rounded-xl px-12 py-3 text-white text-xs outline-none focus:border-gold-500 transition-colors"
@@ -311,29 +311,66 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           </div>
 
           <div className="bg-slate-900/50 backdrop-blur-xl rounded-[3rem] border border-white/5 overflow-hidden shadow-2xl">
-            <table className="w-full text-left">
-              <thead className="bg-black/40 text-slate-500 text-[10px] uppercase font-black tracking-[0.3em]">
-                <tr><th className="p-8">Identity</th><th className="p-8">Role</th><th className="p-8 text-center">Balance</th><th className="p-8 text-center">Net Worth</th><th className="p-8 text-right">Actions</th></tr>
-              </thead>
-              <tbody className="divide-y divide-white/5">
-                {filteredUsers.map(user => (
-                  <tr key={user.id} className="hover:bg-white/5 transition-colors group">
-                    <td className="p-8"><div className="flex items-center space-x-4"><div className="w-10 h-10 bg-gold-500/10 rounded-xl flex items-center justify-center border border-gold-500/20"><UserCircle className="text-gold-500" size={24} /></div><div><div className="text-white font-bold">{user.name}</div><div className="text-[10px] text-slate-500 font-mono">{user.email}</div></div></div></td>
-                    <td className="p-8"><span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase ${user.role === 'ADMIN' ? 'bg-red-500/10 text-red-500' : 'bg-gold-500/10 text-gold-500'}`}>{user.role}</span></td>
-                    <td className="p-8 text-center"><div className="font-mono text-lg text-white font-bold">${Number(user.balance).toLocaleString()}</div></td>
-                    <td className="p-8 text-center"><div className="font-mono text-lg text-gold-500 font-bold">${calculateUserNetWorth(user).toLocaleString()}</div></td>
-                    <td className="p-8 text-right">
-                      <button 
-                        onClick={() => setSelectedUser(user)}
-                        className="p-3 bg-white/5 rounded-xl hover:bg-gold-500/10 transition-colors group"
-                      >
-                        <Settings size={18} className="text-slate-400 group-hover:text-gold-500 transition-colors"/>
-                      </button>
-                    </td>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead className="bg-black/40 text-slate-500 text-[10px] uppercase font-black tracking-[0.3em]">
+                  <tr>
+                    <th className="p-8">Identity</th>
+                    <th className="p-8">Role / Status</th>
+                    <th className="p-8 text-center">Liquid Balance</th>
+                    <th className="p-8 text-center">Last Activity</th>
+                    <th className="p-8 text-right">Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {filteredUsers.map(user => (
+                    <tr key={user.id} className="hover:bg-white/5 transition-colors group">
+                      <td className="p-8">
+                        <div className="flex items-center space-x-4">
+                          <div className="w-10 h-10 bg-gold-500/10 rounded-xl flex items-center justify-center border border-gold-500/20">
+                            <UserCircle className="text-gold-500" size={24} />
+                          </div>
+                          <div>
+                            <div className="text-white font-bold">{user.name}</div>
+                            <div className="text-[10px] text-slate-500 font-mono flex items-center">
+                              <Mail size={10} className="mr-1 opacity-50"/> {user.email}
+                            </div>
+                            <div className="flex items-center space-x-3 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                               <div className="text-[9px] text-slate-600 font-black uppercase tracking-tighter flex items-center"><Phone size={8} className="mr-1"/>{user.phone || 'N/A'}</div>
+                               <div className="text-[9px] text-slate-600 font-black uppercase tracking-tighter flex items-center"><MapPin size={8} className="mr-1"/>{user.address ? 'Registered' : 'N/A'}</div>
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="p-8">
+                        <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase ${user.role === 'ADMIN' ? 'bg-red-500/10 text-red-500 border border-red-500/20' : 'bg-gold-500/10 text-gold-500 border border-gold-500/20'}`}>
+                          {user.role}
+                        </span>
+                      </td>
+                      <td className="p-8 text-center">
+                        <div className="font-mono text-lg text-white font-bold">${Number(user.balance).toLocaleString()}</div>
+                        <div className="text-[9px] text-slate-500 font-black uppercase tracking-widest mt-1">Equity: ${calculateUserNetWorth(user).toLocaleString()}</div>
+                      </td>
+                      <td className="p-8 text-center">
+                        <div className="text-[10px] text-white font-mono">{user.lastLogin ? new Date(user.lastLogin).toLocaleDateString() : 'Never'}</div>
+                        <div className="text-[9px] text-slate-500 font-mono mt-1">{user.lastLogin ? new Date(user.lastLogin).toLocaleTimeString() : '---'}</div>
+                      </td>
+                      <td className="p-8 text-right">
+                        <button 
+                          onClick={() => setSelectedUser(user)}
+                          className="p-3 bg-white/5 rounded-xl hover:bg-gold-500/10 transition-colors group"
+                        >
+                          <Settings size={18} className="text-slate-400 group-hover:text-gold-500 transition-colors"/>
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                  {filteredUsers.length === 0 && (
+                    <tr><td colSpan={5} className="p-32 text-center text-slate-500 font-black uppercase text-xs tracking-widest">No matching members found.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}
@@ -486,6 +523,17 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 </div>
 
                 <div className="space-y-8">
+                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="p-4 bg-black/40 rounded-2xl border border-white/5 flex items-center space-x-3">
+                         <Phone size={16} className="text-slate-500" />
+                         <span className="text-xs font-mono text-slate-300">{selectedUser.phone || 'No phone registered'}</span>
+                      </div>
+                      <div className="p-4 bg-black/40 rounded-2xl border border-white/5 flex items-center space-x-3">
+                         <MapPin size={16} className="text-slate-500" />
+                         <span className="text-xs font-mono text-slate-300 truncate">{selectedUser.address || 'No address registered'}</span>
+                      </div>
+                   </div>
+
                    <div>
                       <label className="text-[10px] text-slate-500 font-black uppercase tracking-[0.2em] mb-4 block">Manual Balance Adjustment</label>
                       <div className="flex items-center space-x-4">
@@ -533,7 +581,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                             }}
                             className="px-6 py-3 bg-red-600 text-white rounded-xl font-black uppercase text-[10px] hover:bg-red-700 transition-all shadow-lg"
                          >
-                            Terminated Account
+                            Terminate Account
                          </button>
                       </div>
                    </div>

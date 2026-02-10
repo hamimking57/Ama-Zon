@@ -42,6 +42,7 @@ export interface User {
   role: 'USER' | 'ADMIN';
   balance: number;
   portfolio: Record<AssetType, number>; // Amount owned
+  lastLogin?: string; // ISO string of last activity
 }
 
 export interface Transaction {

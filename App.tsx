@@ -43,7 +43,6 @@ const App: React.FC = () => {
     const init = async () => {
       setIsLoading(true);
       
-      // 1. Recover from Local Storage immediately for zero-flicker UI
       const savedUserStr = localStorage.getItem('ama_session_user');
       const savedPage = localStorage.getItem('ama_current_page');
       
@@ -51,7 +50,6 @@ const App: React.FC = () => {
         try {
           const parsed = JSON.parse(savedUserStr);
           setUser(parsed);
-          // Only restore dashboard/admin pages to avoid landing on login/signup after refresh
           if (savedPage && (savedPage === 'dashboard' || savedPage === 'admin')) {
             setCurrentPage(savedPage);
           } else {
@@ -62,19 +60,16 @@ const App: React.FC = () => {
         }
       }
 
-      // 2. Fetch fresh data from DB
       await fetchData(true);
       setIsLoading(false);
     };
     init();
   }, []);
 
-  // Save current page to local storage whenever it changes
   useEffect(() => {
     localStorage.setItem('ama_current_page', currentPage);
   }, [currentPage]);
 
-  // Global Data Fetcher
   const fetchData = async (silent = false) => {
     if (!silent) setIsRefreshing(true);
     try {
@@ -88,13 +83,11 @@ const App: React.FC = () => {
       if (t) setTransactions(t);
       if (g && g.length > 0) setGateways(g);
       
-      // Sync current logged in user with latest database state
       const currentSessionId = localStorage.getItem('ama_session_user_id');
       if (currentSessionId) {
-        // Find the user in the fresh users list to update balance/portfolio
         const freshUser = u.find(x => x.id === currentSessionId);
         if (currentSessionId === 'admin-1') {
-          // Master Admin session remains
+          // Master Admin
         } else if (freshUser) {
           setUser(freshUser);
           localStorage.setItem('ama_session_user', JSON.stringify(freshUser));
@@ -127,7 +120,8 @@ const App: React.FC = () => {
     if (inputEmail === 'emukhan580' && inputPass === 'Imran2015@!@!') {
       const admin: User = { 
         id: 'admin-1', name: 'Master Admin', email: 'emukhan580', 
-        role: 'ADMIN', balance: 9999999, portfolio: {} as any 
+        role: 'ADMIN', balance: 9999999, portfolio: {} as any,
+        lastLogin: new Date().toISOString()
       };
       setUser(admin);
       localStorage.setItem('ama_session_user', JSON.stringify(admin));
@@ -139,10 +133,13 @@ const App: React.FC = () => {
 
     const foundUser = users.find(u => u.email.toLowerCase() === inputEmail.toLowerCase());
     if (foundUser) {
-      setUser(foundUser);
-      localStorage.setItem('ama_session_user', JSON.stringify(foundUser));
-      localStorage.setItem('ama_session_user_id', foundUser.id);
+      const updatedUser = { ...foundUser, lastLogin: new Date().toISOString() };
+      setUser(updatedUser);
+      localStorage.setItem('ama_session_user', JSON.stringify(updatedUser));
+      localStorage.setItem('ama_session_user_id', updatedUser.id);
       setCurrentPage('dashboard');
+      // Update the database with last login
+      await DB.syncUser(updatedUser);
     } else {
       alert("Invalid credentials. Please Sign Up.");
     }
@@ -164,6 +161,7 @@ const App: React.FC = () => {
     const newUser: User = { 
       id: generateId(), name, email: sEmail.toLowerCase(), 
       address, phone, role: 'USER', balance: 0, 
+      lastLogin: new Date().toISOString(),
       portfolio: { 
         [AssetType.BITCOIN]: 0, [AssetType.GOLD]: 0, [AssetType.DIAMOND]: 0, 
         [AssetType.SILVER]: 0, [AssetType.PLATINUM]: 0, [AssetType.ANTIMATTER]: 0,
@@ -172,19 +170,12 @@ const App: React.FC = () => {
     };
 
     try {
-      // 1. Sync to cloud first to ensure admin can see it
       await DB.syncUser(newUser);
-      
-      // 2. Update local state for immediate feedback
       setUsers(prev => [...prev, newUser]);
       setUser(newUser);
-      
-      // 3. Persist session
       localStorage.setItem('ama_session_user', JSON.stringify(newUser));
       localStorage.setItem('ama_session_user_id', newUser.id);
       setCurrentPage('dashboard');
-      
-      // 4. Force refresh to confirm sync
       await fetchData(true);
     } catch (err) {
       console.error("Signup failed:", err);
