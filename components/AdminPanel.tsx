@@ -7,7 +7,7 @@ import {
   Link as LinkIcon, Building2, Hash, Globe, Percent, ArrowDownToLine, 
   ArrowUpToLine, UserCircle, Image as ImageIcon, Wallet, ArrowDownRight, 
   Users, Mail, PieChart, Database, Terminal, FileJson, Trash, Server, 
-  Activity, Copy, Check, Filter, Calendar, Search
+  Activity, Copy, Check, Filter, Calendar, Search, Edit3, Settings, AlertTriangle, X
 } from 'lucide-react';
 
 interface AdminPanelProps {
@@ -19,6 +19,8 @@ interface AdminPanelProps {
   onUpdateGateway: (name: string, active: boolean) => void;
   onAddGateway: (gateway: Omit<PaymentGateway, 'apiKey'>) => void;
   onRemoveGateway: (name: string) => void;
+  onUpdateUser: (user: User) => void;
+  onDeleteUser: (userId: string) => void;
 }
 
 export const AdminPanel: React.FC<AdminPanelProps> = ({ 
@@ -29,11 +31,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   gateways, 
   onUpdateGateway,
   onAddGateway,
-  onRemoveGateway
+  onRemoveGateway,
+  onUpdateUser,
+  onDeleteUser
 }) => {
   const [tab, setTab] = useState('requests');
   const [typeFilter, setTypeFilter] = useState<string>('ALL');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
+  const [userSearch, setUserSearch] = useState('');
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [balanceAdjustment, setBalanceAdjustment] = useState<string>('0');
   
   const [form, setForm] = useState({
     name: '', bankName: '', accountNumber: '', link: '', currency: 'USD',
@@ -53,6 +60,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     });
   }, [transactions, typeFilter, statusFilter]);
 
+  const filteredUsers = useMemo(() => {
+    return users.filter(u => 
+      u.name.toLowerCase().includes(userSearch.toLowerCase()) || 
+      u.email.toLowerCase().includes(userSearch.toLowerCase())
+    );
+  }, [users, userSearch]);
+
   const handleAddNew = (e: React.FormEvent) => {
     e.preventDefault();
     if (form.name.trim()) {
@@ -71,7 +85,22 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     const portfolioValue = assets.reduce((acc, asset) => {
       return acc + (targetUser.portfolio[asset.type] || 0) * asset.price;
     }, 0);
-    return targetUser.balance + portfolioValue;
+    return Number(targetUser.balance) + portfolioValue;
+  };
+
+  const handleAdjustBalance = (type: 'ADD' | 'SUBTRACT') => {
+    if (!selectedUser) return;
+    const adj = parseFloat(balanceAdjustment);
+    if (isNaN(adj) || adj <= 0) return;
+
+    const newBalance = type === 'ADD' 
+      ? Number(selectedUser.balance) + adj 
+      : Math.max(0, Number(selectedUser.balance) - adj);
+    
+    const updated = { ...selectedUser, balance: newBalance };
+    onUpdateUser(updated);
+    setSelectedUser(updated);
+    setBalanceAdjustment('0');
   };
 
   return (
@@ -86,7 +115,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           {tab === 'history' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-gold-500 shadow-[0_0_10px_rgba(234,179,8,0.5)]"></div>}
         </button>
         <button onClick={() => setTab('users')} className={`pb-4 px-2 font-black uppercase tracking-[0.2em] text-[11px] whitespace-nowrap transition-all relative ${tab === 'users' ? 'text-gold-500' : 'text-slate-500 hover:text-slate-300'}`}>
-          User Management ({users.length})
+          User Maintenance ({users.length})
           {tab === 'users' && <div className="absolute bottom-0 left-0 w-full h-0.5 bg-gold-500 shadow-[0_0_10px_rgba(234,179,8,0.5)]"></div>}
         </button>
         <button onClick={() => setTab('settings')} className={`pb-4 px-2 font-black uppercase tracking-[0.2em] text-[11px] whitespace-nowrap transition-all relative ${tab === 'settings' ? 'text-gold-500' : 'text-slate-500 hover:text-slate-300'}`}>
@@ -241,23 +270,51 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       )}
 
       {tab === 'users' && (
-        <div className="bg-slate-900/50 backdrop-blur-xl rounded-[3rem] border border-white/5 overflow-hidden shadow-2xl animate-in fade-in duration-500">
-          <table className="w-full text-left">
-            <thead className="bg-black/40 text-slate-500 text-[10px] uppercase font-black tracking-[0.3em]">
-              <tr><th className="p-8">Identity</th><th className="p-8">Role</th><th className="p-8 text-center">Balance</th><th className="p-8 text-center">Net Worth</th><th className="p-8 text-right">Actions</th></tr>
-            </thead>
-            <tbody className="divide-y divide-white/5">
-              {users.map(user => (
-                <tr key={user.id} className="hover:bg-white/5 transition-colors group">
-                  <td className="p-8"><div className="flex items-center space-x-4"><div className="w-10 h-10 bg-gold-500/10 rounded-xl flex items-center justify-center border border-gold-500/20"><UserCircle className="text-gold-500" size={24} /></div><div><div className="text-white font-bold">{user.name}</div><div className="text-[10px] text-slate-500 font-mono">{user.email}</div></div></div></td>
-                  <td className="p-8"><span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase ${user.role === 'ADMIN' ? 'bg-red-500/10 text-red-500' : 'bg-gold-500/10 text-gold-500'}`}>{user.role}</span></td>
-                  <td className="p-8 text-center"><div className="font-mono text-lg text-white font-bold">${user.balance.toLocaleString()}</div></td>
-                  <td className="p-8 text-center"><div className="font-mono text-lg text-gold-500 font-bold">${calculateUserNetWorth(user).toLocaleString()}</div></td>
-                  <td className="p-8 text-right"><button className="p-3 bg-white/5 rounded-xl hover:bg-gold-500/10 transition-colors"><PieChart size={18} className="text-slate-400 group-hover:text-gold-500"/></button></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="space-y-6 animate-in fade-in duration-500">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-6 bg-slate-900/50 rounded-[2rem] border border-white/5">
+            <div className="flex items-center space-x-4">
+              <div className="p-3 bg-gold-500/10 rounded-xl">
+                <Users className="text-gold-500" size={20} />
+              </div>
+              <h4 className="text-white font-bold uppercase text-xs tracking-widest">Search Member Directory</h4>
+            </div>
+            <div className="relative w-full md:w-80">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600" size={16} />
+              <input 
+                type="text" 
+                placeholder="Name or Email..." 
+                value={userSearch}
+                onChange={(e) => setUserSearch(e.target.value)}
+                className="w-full bg-black border border-white/10 rounded-xl px-12 py-3 text-white text-xs outline-none focus:border-gold-500 transition-colors"
+              />
+            </div>
+          </div>
+
+          <div className="bg-slate-900/50 backdrop-blur-xl rounded-[3rem] border border-white/5 overflow-hidden shadow-2xl">
+            <table className="w-full text-left">
+              <thead className="bg-black/40 text-slate-500 text-[10px] uppercase font-black tracking-[0.3em]">
+                <tr><th className="p-8">Identity</th><th className="p-8">Role</th><th className="p-8 text-center">Balance</th><th className="p-8 text-center">Net Worth</th><th className="p-8 text-right">Actions</th></tr>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {filteredUsers.map(user => (
+                  <tr key={user.id} className="hover:bg-white/5 transition-colors group">
+                    <td className="p-8"><div className="flex items-center space-x-4"><div className="w-10 h-10 bg-gold-500/10 rounded-xl flex items-center justify-center border border-gold-500/20"><UserCircle className="text-gold-500" size={24} /></div><div><div className="text-white font-bold">{user.name}</div><div className="text-[10px] text-slate-500 font-mono">{user.email}</div></div></div></td>
+                    <td className="p-8"><span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase ${user.role === 'ADMIN' ? 'bg-red-500/10 text-red-500' : 'bg-gold-500/10 text-gold-500'}`}>{user.role}</span></td>
+                    <td className="p-8 text-center"><div className="font-mono text-lg text-white font-bold">${Number(user.balance).toLocaleString()}</div></td>
+                    <td className="p-8 text-center"><div className="font-mono text-lg text-gold-500 font-bold">${calculateUserNetWorth(user).toLocaleString()}</div></td>
+                    <td className="p-8 text-right">
+                      <button 
+                        onClick={() => setSelectedUser(user)}
+                        className="p-3 bg-white/5 rounded-xl hover:bg-gold-500/10 transition-colors group"
+                      >
+                        <Settings size={18} className="text-slate-400 group-hover:text-gold-500 transition-colors"/>
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
@@ -369,6 +426,99 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 </div>
               ))}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* User Management Modal */}
+      {selectedUser && (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-black/90 backdrop-blur-2xl">
+          <div className="bg-slate-900 border border-white/10 rounded-[3.5rem] w-full max-w-2xl overflow-hidden shadow-2xl animate-in zoom-in fade-in duration-300">
+             <div className="p-10">
+                <div className="flex justify-between items-start mb-10">
+                  <div className="flex items-center space-x-6">
+                     <div className="w-20 h-20 bg-gold-500/10 rounded-[2rem] border border-gold-500/20 flex items-center justify-center">
+                        <UserCircle className="text-gold-500" size={48} />
+                     </div>
+                     <div>
+                        <h2 className="text-3xl font-bold text-white mb-1">{selectedUser.name}</h2>
+                        <p className="text-slate-500 font-mono text-sm">{selectedUser.email}</p>
+                        <div className="flex items-center space-x-2 mt-2">
+                           <span className="px-3 py-1 bg-white/5 border border-white/10 rounded-full text-[9px] font-black uppercase text-slate-400">ID: {selectedUser.id}</span>
+                           <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase ${selectedUser.role === 'ADMIN' ? 'bg-red-500/10 text-red-500' : 'bg-gold-500/10 text-gold-500'}`}>{selectedUser.role}</span>
+                        </div>
+                     </div>
+                  </div>
+                  <button onClick={() => setSelectedUser(null)} className="p-3 hover:bg-white/5 rounded-2xl transition-colors text-slate-500 hover:text-white">
+                    <X size={24} />
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-6 mb-10">
+                   <div className="p-6 bg-black/40 rounded-3xl border border-white/5">
+                      <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-2">Liquid Balance</p>
+                      <p className="text-3xl font-mono font-bold text-white">${Number(selectedUser.balance).toLocaleString()}</p>
+                   </div>
+                   <div className="p-6 bg-black/40 rounded-3xl border border-white/5">
+                      <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-2">Total Equity</p>
+                      <p className="text-3xl font-mono font-bold text-gold-500">${calculateUserNetWorth(selectedUser).toLocaleString()}</p>
+                   </div>
+                </div>
+
+                <div className="space-y-8">
+                   <div>
+                      <label className="text-[10px] text-slate-500 font-black uppercase tracking-[0.2em] mb-4 block">Manual Balance Adjustment</label>
+                      <div className="flex items-center space-x-4">
+                         <div className="relative flex-grow">
+                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gold-500 font-bold">$</span>
+                            <input 
+                              type="number" 
+                              value={balanceAdjustment}
+                              onChange={(e) => setBalanceAdjustment(e.target.value)}
+                              className="w-full bg-black border border-white/10 rounded-2xl px-10 py-4 text-white font-mono outline-none focus:border-gold-500 transition-all"
+                            />
+                         </div>
+                         <button 
+                            onClick={() => handleAdjustBalance('SUBTRACT')}
+                            className="px-6 py-4 bg-red-500/10 text-red-500 border border-red-500/20 rounded-2xl hover:bg-red-500 hover:text-white transition-all font-black uppercase text-[10px]"
+                         >
+                            Subtract
+                         </button>
+                         <button 
+                            onClick={() => handleAdjustBalance('ADD')}
+                            className="px-6 py-4 bg-green-500/10 text-green-500 border border-green-500/20 rounded-2xl hover:bg-green-500 hover:text-white transition-all font-black uppercase text-[10px]"
+                         >
+                            Add Funds
+                         </button>
+                      </div>
+                   </div>
+
+                   <div className="pt-8 border-t border-white/5">
+                      <div className="flex items-center justify-between p-6 bg-red-500/5 border border-red-500/10 rounded-[2rem]">
+                         <div className="flex items-center space-x-4">
+                            <div className="p-3 bg-red-500/10 rounded-xl">
+                               <AlertTriangle className="text-red-500" size={20} />
+                            </div>
+                            <div>
+                               <p className="text-white font-bold text-sm">Delete Account</p>
+                               <p className="text-[10px] text-slate-500 uppercase font-black tracking-widest">Permanent action - cannot be undone</p>
+                            </div>
+                         </div>
+                         <button 
+                            onClick={() => {
+                              if (confirm(`Are you absolutely sure you want to delete ${selectedUser.name}'s account? This will erase all their portfolio data.`)) {
+                                onDeleteUser(selectedUser.id);
+                                setSelectedUser(null);
+                              }
+                            }}
+                            className="px-6 py-3 bg-red-600 text-white rounded-xl font-black uppercase text-[10px] hover:bg-red-700 transition-all shadow-lg"
+                         >
+                            Terminated Account
+                         </button>
+                      </div>
+                   </div>
+                </div>
+             </div>
           </div>
         </div>
       )}

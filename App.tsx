@@ -127,7 +127,7 @@ const App: React.FC = () => {
       address,
       phone,
       role: 'USER', 
-      balance: 0, // Zero initial balance as requested
+      balance: 0, 
       portfolio: { 
         [AssetType.BITCOIN]: 0, 
         [AssetType.GOLD]: 0, 
@@ -208,42 +208,47 @@ const App: React.FC = () => {
 
   const handleProcessTransaction = async (id: string, status: TransactionStatus) => {
     await DB.updateTransactionStatus(id, status);
-    
-    // Update transactions list
     setTransactions(prev => prev.map(t => t.id === id ? { ...t, status } : t));
     
     const tx = transactions.find(t => t.id === id);
     if (!tx) return;
 
-    // Logic for updating user balance based on approval/rejection
     const targetUser = users.find(u => u.id === tx.userId);
     if (targetUser) {
-      let newBalance = targetUser.balance;
-
+      let newBalance = Number(targetUser.balance);
       if (status === TransactionStatus.APPROVED && tx.type === TransactionType.DEPOSIT) {
-        // Add funds on approved deposit
         newBalance += tx.amount;
       } else if (status === TransactionStatus.REJECTED && tx.type === TransactionType.WITHDRAW) {
-        // Return funds on rejected withdrawal (since it was held)
         newBalance += tx.amount;
-      } else if (status === TransactionStatus.REJECTED && tx.type === TransactionType.DEPOSIT) {
-        // Nothing to do, deposit was rejected so balance remains same
-      } else if (status === TransactionStatus.APPROVED && tx.type === TransactionType.WITHDRAW) {
-        // Nothing to do, balance was already held/deducted
-      } else {
-        return; // No balance change needed for buy/sell
       }
 
       const updated = { ...targetUser, balance: newBalance };
       await DB.syncUser(updated);
-      
-      // Sync global users list
       setUsers(prev => prev.map(u => u.id === updated.id ? updated : u));
-      
-      // Sync currently logged in user if they are the target
-      if (user && user.id === updated.id) {
-        setUser(updated);
-      }
+      if (user && user.id === updated.id) setUser(updated);
+    }
+  };
+
+  const handleAdminUpdateUser = async (updated: User) => {
+    try {
+      await DB.syncUser(updated);
+      setUsers(prev => prev.map(u => u.id === updated.id ? updated : u));
+      if (user && user.id === updated.id) setUser(updated);
+      console.log("User updated by Admin");
+    } catch (err) {
+      console.error("Failed to update user:", err);
+      alert("Database sync failed.");
+    }
+  };
+
+  const handleAdminDeleteUser = async (userId: string) => {
+    try {
+      await DB.deleteUser(userId);
+      setUsers(prev => prev.filter(u => u.id !== userId));
+      alert("User account has been terminated.");
+    } catch (err) {
+      console.error("Failed to delete user:", err);
+      alert("Database error while deleting user.");
     }
   };
 
@@ -407,7 +412,7 @@ const App: React.FC = () => {
                       <Wallet className="text-gold-500" size={24} />
                       <span className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Liquid Balance</span>
                    </div>
-                   <div className="text-5xl font-mono text-white font-black tracking-tight mb-8">${user.balance.toLocaleString()}</div>
+                   <div className="text-5xl font-mono text-white font-black tracking-tight mb-8">${Number(user.balance).toLocaleString()}</div>
                  </div>
                  <div className="grid grid-cols-2 gap-4">
                    <button 
@@ -448,6 +453,8 @@ const App: React.FC = () => {
             users={users} 
             assets={assets} 
             onProcessTransaction={handleProcessTransaction} 
+            onUpdateUser={handleAdminUpdateUser}
+            onDeleteUser={handleAdminDeleteUser}
             gateways={gateways} 
             onUpdateGateway={async (n, a) => {
               const gw = gateways.find(g => g.name === n);

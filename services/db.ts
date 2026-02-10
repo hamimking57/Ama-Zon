@@ -23,7 +23,6 @@ export const DB = {
       return;
     }
     
-    // Attempting to upsert into the 'users' table
     const { error } = await supabase.from('users').upsert({
       id: user.id,
       name: user.name,
@@ -38,6 +37,20 @@ export const DB = {
     if (error) {
       console.error("Sync User Error:", error.message, error.details);
       throw new Error(`Failed to save user to database: ${error.message}`);
+    }
+  },
+
+  deleteUser: async (userId: string) => {
+    if (!isSupabaseConfigured || !supabase) {
+      const local = JSON.parse(localStorage.getItem('local_users') || '[]');
+      const filtered = local.filter((u: any) => u.id !== userId);
+      localStorage.setItem('local_users', JSON.stringify(filtered));
+      return;
+    }
+    const { error } = await supabase.from('users').delete().eq('id', userId);
+    if (error) {
+      console.error("Delete User Error:", error.message);
+      throw error;
     }
   },
 
