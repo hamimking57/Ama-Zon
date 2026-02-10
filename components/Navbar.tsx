@@ -14,10 +14,14 @@ interface NavbarProps {
 
 export const BrandLogo = ({ className = "w-8 h-8" }: { className?: string }) => (
   <svg viewBox="0 0 100 100" className={className} fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M20 80L50 20L80 80" stroke="url(#logo-grad)" strokeWidth="12" strokeLinecap="round" strokeLinejoin="round"/>
-    <path d="M30 85C40 92 60 92 70 85" stroke="#EAB308" strokeWidth="6" strokeLinecap="round" className="animate-pulse"/>
+    <path d="M25 75L50 25L75 75" stroke="url(#logo-grad)" strokeWidth="10" strokeLinecap="round" strokeLinejoin="round"/>
+    <path d="M35 55H65" stroke="url(#logo-grad)" strokeWidth="8" strokeLinecap="round"/>
+    <path d="M20 85C35 95 65 95 80 85" stroke="#EAB308" strokeWidth="6" strokeLinecap="round" className="animate-pulse">
+      <title>Premium Success Curve</title>
+    </path>
+    <path d="M75 82L80 85L78 89" stroke="#EAB308" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"/>
     <defs>
-      <linearGradient id="logo-grad" x1="20" y1="20" x2="80" y2="80" gradientUnits="userSpaceOnUse">
+      <linearGradient id="logo-grad" x1="25" y1="25" x2="75" y2="75" gradientUnits="userSpaceOnUse">
         <stop stopColor="#FACC15"/>
         <stop offset="1" stopColor="#B45309"/>
       </linearGradient>
@@ -32,7 +36,7 @@ export const Navbar: React.FC<NavbarProps> = ({ user, onLogout, onNavigate, curr
         <div className="flex justify-between h-16 items-center">
           <div className="flex items-center cursor-pointer group" onClick={() => onNavigate('home')}>
             <div className="mr-3 transform group-hover:scale-110 transition-transform duration-300">
-              <BrandLogo className="w-9 h-9 drop-shadow-[0_0_8px_rgba(234,179,8,0.4)]" />
+              <BrandLogo className="w-10 h-10 drop-shadow-[0_0_12px_rgba(234,179,8,0.5)]" />
             </div>
             <span className="font-serif text-2xl font-bold tracking-tight text-white">
               Ama<span className="text-gold-500">.zon</span>
@@ -50,9 +54,9 @@ export const Navbar: React.FC<NavbarProps> = ({ user, onLogout, onNavigate, curr
                 </button>
                 <button 
                   onClick={() => onNavigate('signup')}
-                  className="px-4 py-2 bg-gold-500/10 border border-gold-500/50 rounded-lg text-gold-500 text-xs font-black uppercase tracking-widest hover:bg-gold-500 hover:text-black transition-all"
+                  className="px-5 py-2.5 bg-gold-500 text-black text-xs font-black uppercase tracking-widest rounded-xl hover:bg-gold-400 transition-all shadow-[0_0_20px_rgba(234,179,8,0.2)]"
                 >
-                  Join
+                  Apply
                 </button>
               </div>
             ) : (
