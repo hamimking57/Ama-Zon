@@ -11,38 +11,6 @@ export const INITIAL_ASSETS: Asset[] = [
     color: '#F7931A' 
   },
   { 
-    type: AssetType.ANTIMATTER, 
-    name: 'Anti-Matter Particles', 
-    symbol: 'AM', 
-    price: 625000000, 
-    change24h: 0.05, 
-    color: '#D8B4FE' 
-  },
-  { 
-    type: AssetType.AI_COMPUTE, 
-    name: 'AGI Compute Tokens', 
-    symbol: 'AIX', 
-    price: 125400.00, 
-    change24h: 8.4, 
-    color: '#22D3EE' 
-  },
-  { 
-    type: AssetType.NEURAL_LINK, 
-    name: 'Neural Link Arrays', 
-    symbol: 'NLA', 
-    price: 45200.00, 
-    change24h: -1.2, 
-    color: '#FB7185' 
-  },
-  { 
-    type: AssetType.FUSION_ENERGY, 
-    name: 'Fusion Energy Credits', 
-    symbol: 'FEC', 
-    price: 8500.00, 
-    change24h: 4.7, 
-    color: '#34D399' 
-  },
-  { 
     type: AssetType.DIAMOND, 
     name: 'Blue Diamond', 
     symbol: 'DMD', 
@@ -52,11 +20,35 @@ export const INITIAL_ASSETS: Asset[] = [
   },
   { 
     type: AssetType.GOLD, 
-    name: '24K Gold', 
+    name: '24K Pure Gold', 
     symbol: 'XAU', 
     price: 2750.80, 
     change24h: 0.4, 
     color: '#FACC15' 
+  },
+  { 
+    type: AssetType.PLATINUM, 
+    name: 'Platinum', 
+    symbol: 'XPT', 
+    price: 985.40, 
+    change24h: 1.2, 
+    color: '#E5E7EB' 
+  },
+  { 
+    type: AssetType.SILVER, 
+    name: 'Silver', 
+    symbol: 'XAG', 
+    price: 32.15, 
+    change24h: -0.8, 
+    color: '#94A3B8' 
+  },
+  { 
+    type: AssetType.ANTIMATTER, 
+    name: 'Anti-Matter Particles', 
+    symbol: 'AM', 
+    price: 625000000, 
+    change24h: 0.05, 
+    color: '#D8B4FE' 
   }
 ];
 
@@ -77,7 +69,7 @@ export const generateId = () => {
 
 export const fluctuatePrices = (assets: Asset[]): Asset[] => {
   return assets.map(asset => {
-    const volatility = (asset.type === AssetType.BITCOIN || asset.type === AssetType.AI_COMPUTE || asset.type === AssetType.FUSION_ENERGY) ? 0.015 : 0.005; 
+    const volatility = (asset.type === AssetType.BITCOIN || asset.type === AssetType.ANTIMATTER) ? 0.015 : 0.005; 
     const change = 1 + (Math.random() * volatility * 2 - volatility);
     const newPrice = asset.price * change;
     return {

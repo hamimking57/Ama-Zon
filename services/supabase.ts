@@ -1,15 +1,11 @@
 
 import { createClient } from '@supabase/supabase-js';
 
-// আপনার প্রোভাইড করা ডাটাবেস লিংক থেকে প্রাপ্ত প্রজেক্ট URL
+// আপনার প্রোভাইড করা ডাটাবেস লিংক
 const supabaseUrl = 'https://edxydlrproekcaitmirs.supabase.co';
 
-// Try to get the key from multiple possible environment variable locations
-const supabaseAnonKey = 
-  (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || 
-  (process.env as any).VITE_SUPABASE_ANON_KEY ||
-  (process.env as any).SUPABASE_ANON_KEY || 
-  '';
+// আপনার প্রোভাইড করা API Key সরাসরি ব্যবহার করা হয়েছে যাতে কানেকশন গ্যারান্টিড থাকে
+const supabaseAnonKey = 'sb_publishable_Y2JdOXuxnSkgH9m04R8Lxg_Z-lAf_sE';
 
 export const isSupabaseConfigured = !!supabaseUrl && !!supabaseAnonKey;
 

@@ -36,17 +36,12 @@ export const DB = {
   // --- USERS ---
   fetchUsers: async (): Promise<User[]> => {
     const localData = LocalBackup.get('ama_users');
-    if (!isSupabaseConfigured || !supabase) {
-      console.warn("Supabase not connected. Using Local Mode.");
-      return localData;
-    }
+    if (!isSupabaseConfigured || !supabase) return localData;
 
     try {
       const { data, error } = await supabase.from('users').select('*');
       if (error) throw error;
-      
       if (data) {
-        // Map database snake_case to frontend camelCase
         const formatted = data.map((u: any) => ({
           ...u,
           lastLogin: u.last_login || u.lastLogin || new Date().toISOString()
@@ -56,25 +51,20 @@ export const DB = {
       }
       return localData;
     } catch (err) {
-      console.error("Cloud Fetch Failed:", err);
+      console.error("Cloud Fetch Users Failed:", err);
       return localData;
     }
   },
 
   syncUser: async (user: User) => {
-    // 1. First, secure in browser memory
     LocalBackup.saveItem('ama_users', user);
-    
     const currentId = localStorage.getItem('ama_session_user_id');
     if (currentId === user.id) {
       localStorage.setItem('ama_session_user', JSON.stringify(user));
     }
-
-    // 2. Push to Supabase
     if (!isSupabaseConfigured || !supabase) return;
-
     try {
-      const { error } = await supabase.from('users').upsert({
+      await supabase.from('users').upsert({
         id: user.id,
         name: user.name,
         email: user.email,
@@ -85,23 +75,19 @@ export const DB = {
         portfolio: user.portfolio,
         last_login: user.lastLogin
       }, { onConflict: 'id' });
-      
-      if (error) throw error;
-      console.log("Database Sync Success for:", user.email);
     } catch (err) {
-      console.error("Database Sync Error:", err);
+      console.error("User Sync Error:", err);
     }
   },
 
   deleteUser: async (userId: string) => {
     const local = LocalBackup.get('ama_users').filter((u: any) => u.id !== userId);
     LocalBackup.set('ama_users', local);
-
     if (!isSupabaseConfigured || !supabase) return;
     try {
       await supabase.from('users').delete().eq('id', userId);
     } catch (err) {
-      console.error("Delete Error:", err);
+      console.error("Delete User Error:", err);
     }
   },
 
@@ -109,15 +95,9 @@ export const DB = {
   fetchTransactions: async (): Promise<Transaction[]> => {
     const localTx = LocalBackup.get('ama_txs');
     if (!isSupabaseConfigured || !supabase) return localTx;
-
     try {
-      const { data, error } = await supabase
-        .from('transactions')
-        .select('*')
-        .order('created_at', { ascending: false });
-      
+      const { data, error } = await supabase.from('transactions').select('*').order('created_at', { ascending: false });
       if (error) throw error;
-
       if (data) {
         const formatted = data.map((t: any) => ({
           id: t.id,
@@ -131,7 +111,7 @@ export const DB = {
           status: t.status,
           date: t.created_at || t.date,
           externalTxId: t.external_tx_id,
-          payout_details: t.payout_details
+          payoutDetails: t.payout_details
         }));
         LocalBackup.set('ama_txs', formatted);
         return formatted as Transaction[];
@@ -143,14 +123,10 @@ export const DB = {
   },
 
   addTransaction: async (tx: Transaction) => {
-    const local = LocalBackup.get('ama_txs');
-    local.unshift(tx);
-    LocalBackup.set('ama_txs', local);
-
+    LocalBackup.saveItem('ama_txs', tx);
     if (!isSupabaseConfigured || !supabase) return;
-
     try {
-      const { error } = await supabase.from('transactions').insert([{
+      await supabase.from('transactions').insert([{
         id: tx.id,
         user_id: tx.userId,
         user_name: tx.userName,
@@ -163,9 +139,8 @@ export const DB = {
         external_tx_id: tx.externalTxId,
         payout_details: tx.payoutDetails
       }]);
-      if (error) throw error;
     } catch (err) {
-      console.error("Transaction Save Error:", err);
+      console.error("Transaction Creation Error:", err);
     }
   },
 
@@ -174,7 +149,6 @@ export const DB = {
     const index = local.findIndex((t: any) => t.id === id);
     if (index > -1) local[index].status = status;
     LocalBackup.set('ama_txs', local);
-
     if (!isSupabaseConfigured || !supabase) return;
     try {
       await supabase.from('transactions').update({ status }).eq('id', id);
@@ -187,7 +161,6 @@ export const DB = {
   fetchGateways: async (): Promise<PaymentGateway[]> => {
     const localGw = LocalBackup.get('ama_gateways');
     if (!isSupabaseConfigured || !supabase) return localGw;
-
     try {
       const { data, error } = await supabase.from('payment_gateways').select('*');
       if (error) throw error;
@@ -208,8 +181,9 @@ export const DB = {
         LocalBackup.set('ama_gateways', formatted);
         return formatted as PaymentGateway[];
       }
-      return localGw;
+      return []; // Return empty array if no data
     } catch (err) {
+      console.error("Gateway Fetch Error:", err);
       return localGw;
     }
   },
